@@ -1,0 +1,44 @@
+=== Steps to run the baseline model with no phonoligical embeddings ===
+
+1. Create the following directories 
+
+mkdir fr-ht/corpora
+mkdir fr-ht/pred
+mkdir fr-ht/embeds
+mkdir fr-ht/run
+
+2. First create train test split using split.py
+
+ht/en split
+python3 split.py --src-file path-to-hatian  --tgt-file path-to-english --out-file ../OpenNMT-py/fr-ht/corpora/en-ht-15k. --lang ht --train-len 15000 --val-len 5000 --test-len 5000
+fr/en split
+python3 split.py --src-file path-to-french --tgt-file path-to-english --out-file ../OpenNMT-py/fr-ht/corpora/en-fr-250k. --lang fr --train-len 250000 --val-len 5000 --test-len 5000
+
+3. Make the vocabularies for training the onmt model by running the command below. The config file should have all the file paths set up correctly assuming you created all directories in step #1.
+
+onmt_build_vocab -config fr-ht/config/fr-ht.yaml -n_sample -1
+
+4. Train the model 
+
+onmt_train -config fr-ht/config/fr-ht.yaml
+
+5. Translate test set and compute bleu scores using sacrebleu. Make sure sacrebleu is installed (pip install sacrebleu). 
+
+onmt_translate -model fr-ht/run/base/model_step_100000.pt -src fr-ht/corpora/en-ht-15k.ht.test -output fr-ht/pred/base-preds-15k.txt -gpu 0
+sacrebleu fr-ht/corpora/en-ht-15k.en.test -i fr-ht/pred/base-preds-15k.txt -m bleu
+
+=== Steps to run model with phonoligical embeddings ===
+
+1. We need to save the phonoligical embeddings in a file formatted to match the style of GloVe word embeddings like what is below
+
+    word 1.21 2.2 ..... 3.23
+
+I just made a quick script that takes the pickle file created from running trans_featvec.py and writes the formatted embeddings to a new file. 
+
+python3 make_phon_embs.py --emb-path path-to-phon-embeds --out-path path-to-save-formatted-embs
+
+We should make a file that takes in two text files for LRL and HRL and writes all embeddings to a file.
+
+2. Then just follow steps 2-5 in the above instructions but run one of the other config files that uses pretrained embeddings
+
+

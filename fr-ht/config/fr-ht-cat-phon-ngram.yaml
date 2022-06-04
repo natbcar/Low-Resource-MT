@@ -1,0 +1,72 @@
+# toy_en_de.yaml
+
+## Where the samples will be written
+save_data: fr-ht/run/
+## Where the vocab(s) will be written
+src_vocab: fr-ht/run/src.vocab
+tgt_vocab: fr-ht/run/tgt.vocab
+
+# # Prevent overwriting existing files in the folder
+overwrite: True
+
+# Corpus opts:
+data:
+    corpus_1:
+        path_src: fr-ht/corpora/en-fr-250k.fr.train
+        path_tgt: fr-ht/corpora/en-fr-250k.en.train
+    corpus 2:
+        path_src: fr-ht/corpora/en-ht-15k.ht.train
+        path_tgt: fr-ht/corpora/en-ht-15k.en.train
+    valid:
+        path_src: fr-ht/corpora/en-ht-15k.ht.val
+        path_tgt: fr-ht/corpora/en-ht-15k.en.val
+
+# Random seed
+seed: 42
+
+# Vocabulary files that were just created
+src_vocab: fr-ht/run/src.vocab
+tgt_vocab: fr-ht/run/tgt.vocab
+
+src_embeddings: fr-ht/embeds/fr-ht-phon-ngram-cat-embs.txt
+embeddings_type: "GloVe"
+
+# early stopping
+early_stopping: 5
+early_stopping_criteria: accuracy
+
+# Train on a single GPU
+# do export CUDA_VISIBLE_DEVICES= (gpu num)
+world_size: 1
+gpu_ranks: [0]
+
+# Optimization
+model_dtype: "fp32"
+optim: "adam"
+learning_rate: 3
+valid_batch_size: 1024
+decay_method: "noam"
+batch_size: 1024
+batch_type: tokens
+normalization: tokens
+label_smoothing: 0.1
+
+# Model
+encoder_type: transformer
+decoder_type: transformer
+position_encoding: true
+enc_layers: 6
+dec_layers: 6
+heads: 8
+rnn_size: 512
+word_vec_size: 512
+transformer_ff: 2048
+dropout_steps: [0]
+dropout: [0.1]
+attention_dropout: [0.1]
+
+# Where to save the checkpoints
+save_model: fr-ht/run/cat-phon-ngram/model
+save_checkpoint_steps: 10000
+train_steps: 100000
+valid_steps: 5000
