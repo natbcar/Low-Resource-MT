@@ -69,6 +69,19 @@ def create_dirs(out_dir, out_dir_list=['corpora', 'pred', 'embeds', 'run', 'conf
     print(f"\tdirectories now exist for {out_dir_list}", flush=True)
 
 
+def evaluate(mod_dir, src_test_data, out_path, gpu_num, tgt_test_data, mod_num='max'):
+    """
+    """
+    # Find model path
+    saved_models = os.listdir(models_dir)
+    
+    print("Evaluating model saved at", mod_path, flush=True)
+    eval_cmd_temp = 'onmt_translate -model {} -src {} -output {} -gpu {} sacrebleu {} -i {} -m bleu'
+    eval_cmd = eval_cmd_temp.format(mod_path, src_test_data, out_path, gpu_num, tgt_test_data, out_path)
+    print("\trunning command:", eval_cmd, flush=True)
+    os.system(eval_cmd)
+    print("\teval done", flush=True)
+
 def main(args):
     """
     args:
@@ -209,7 +222,12 @@ embeddings_type: "GloVe"'''
     os.system(train_cmd)
     
     # (8) Evaluate and score ------------------------------------------------
-    return # FIXME just skip this for now
+    # Find model path
+    mod_dir = os.path.join(args.out_dir, 'run', args.phon_type)
+    saved_models = os.listdir(models_dir)
+    evaluate(mod_dir=mod_dir, src_test_data, out_path, gpu_num, tgt_test_data,\
+            mod_num=args.model_eval_num)
+    return
     print("Evaluating model saved at", flush=True)
     '''onmt_translate -model fr-ht/run/base/model_step_100000.pt -src fr-ht/corpora/en-ht-15k.ht.test -output fr-ht/pred/base-preds-15k.txt -gpu 0 sacrebleu fr-ht/corpora/en-ht-15k.en.test -i fr-ht/pred/base-preds-15k.txt -m bleu'''
     # Find model path
@@ -287,11 +305,16 @@ if __name__=='__main__':
     parser.add_argument('--gpu-num', type=int,
             help='which GPU to use',
             default=0)
+    parser.add_argument('--model-eval-num', default='max',
+            help='which model to test')
 
     args = parser.parse_args()
 
     main(args)
 
     '''Example usage:
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 enht_haitian --tgt1 enht_english --src2 enfr_french --tgt2 enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512
+    '''
+    '''Or on patient:
     python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512
     '''
