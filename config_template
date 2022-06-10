@@ -57,6 +57,6 @@ attention_dropout: [0.1]
 
 # Where to save the checkpoints
 save_model: OUTDIR/run/{}/model
-save_checkpoint_steps: 30000
-train_steps: 60000
-valid_steps: 5000
+save_checkpoint_steps: SAVESTEPS
+train_steps: TRAINSTEPS
+valid_steps: VALSTEPS

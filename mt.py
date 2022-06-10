@@ -1,8 +1,11 @@
 import os
 import argparse
+import re
 from split import main as split_data
 import feat_vecs as fv
 import pdb
+
+NUMOBJ = re.compile(r'[0-9]+')
 
 LANG_REGULARIZER = {
         'ht':'hat', 'hat':'hat', 'haitian':'hat',
@@ -34,7 +37,8 @@ def extract_vocab(fn):
     return vocab
 
 
-def create_phon_embeds(lang1_vocab_fn, lang2_vocab_fn, joint_vocab_fn, lang1, lang2, emb_fn, phon_info, emb_dim): # FIXME add types
+def create_phon_embeds(lang1_vocab_fn, lang2_vocab_fn, joint_vocab_fn, lang1, lang2, emb_fn, phon_info,\
+        emb_dim, seed): # FIXME add types
     """
     """
     lang1_vocab = extract_vocab(lang1_vocab_fn)
@@ -42,9 +46,9 @@ def create_phon_embeds(lang1_vocab_fn, lang2_vocab_fn, joint_vocab_fn, lang1, la
     joint_vocab = extract_vocab(joint_vocab_fn)
     ngram_size = phon_info['gram']
     emb_dict1 = fv.many_w2fv(wordlist=lang1_vocab, phon_info=phon_info, epi_lang=EPITRAN_LANGS[lang1],\
-            emb_dim=emb_dim, ngram_size=ngram_size)
+            emb_dim=emb_dim, ngram_size=ngram_size, seed=seed)
     emb_dict2 = fv.many_w2fv(wordlist=lang2_vocab, phon_info=phon_info, epi_lang=EPITRAN_LANGS[lang2],\
-            emb_dim=emb_dim, ngram_size=ngram_size)
+            emb_dim=emb_dim, ngram_size=ngram_size, seed=seed)
     # Combine dictionaries
     for key in emb_dict1:
         emb_dict2[key] = emb_dict1[key]
@@ -73,14 +77,35 @@ def evaluate(mod_dir, src_test_data, out_path, gpu_num, tgt_test_data, mod_num='
     """
     """
     # Find model path
-    saved_models = os.listdir(models_dir)
-    
+    saved_models = os.listdir(mod_dir)
+    num2saved_mod = {int(NUMOBJ.search(saved_mod)[0]):saved_mod for saved_mod in saved_models}
+    mod_nums = list(num2saved_mod.keys())
+    if mod_num == 'max':
+        chosen_mod_num = max(mod_nums)
+    else:
+        chosen_mod_num = mod_num
+    try:
+        mod_path_tail = num2saved_mod[int(chosen_mod_num)]
+    except:
+        raise ValueError("Invalid model number {} with saved models {}".format(\
+                chosen_mod_num, saved_models))
+    mod_path = os.path.join(mod_dir, mod_path_tail)
+    # Now evaluate via onmt command
     print("Evaluating model saved at", mod_path, flush=True)
-    eval_cmd_temp = 'onmt_translate -model {} -src {} -output {} -gpu {} sacrebleu {} -i {} -m bleu'
-    eval_cmd = eval_cmd_temp.format(mod_path, src_test_data, out_path, gpu_num, tgt_test_data, out_path)
+    eval_cmd_temp = 'onmt_translate -model {} -src {} -output {} -gpu {}'
+    bleu_cmd_temp = 'sacrebleu {} -i {} -m bleu'
+    chrf_cmd_temp = 'sacrebleu {} -i {} -m chrf --chrf-word-order 2'
+    # first predict translations
+    eval_cmd = eval_cmd_temp.format(mod_path, src_test_data, out_path, gpu_num)
     print("\trunning command:", eval_cmd, flush=True)
     os.system(eval_cmd)
+    # then score
+    bleu_cmd = bleu_cmd_temp.format(tgt_test_data, out_path)
+    print("\trunning command:", bleu_cmd, flush=True)
+    os.system(bleu_cmd)
+    # komya chrf
     print("\teval done", flush=True)
+
 
 def main(args):
     """
@@ -114,7 +139,7 @@ def main(args):
             args.src1_lang, args.train1_len))
     split_data(src_file=args.src1, tgt_file=args.tgt1, out_file=out_f1+'.', \
             lang=args.src1_lang, tgt_lang= args.tgt_lang, train_len=args.train1_len, \
-            val_len=args.val_len, test_len=args.test_len)
+            val_len=args.val_len, test_len=args.test_len, seed=args.seed)
     '''python3 split.py --src-file path-to-french --tgt-file path-to-english 
     --out-file ../OpenNMT-py/fr-ht/corpora/en-fr-250k. --lang fr --train-len 
     250000 --val-len 5000 --test-len 5000'''
@@ -133,7 +158,10 @@ def main(args):
     #   and VOCAB with vocab type
     #   and EMBINFO for embeddings info
     #   and WORDVECSIZE for emb dim
-    # FIXME and gpu num
+    #   and SAVESTEPS for save checkpoint steps (default 30000)
+    #   and TRAINSTEPS for training steps (default 60000)
+    #   and VALSTEPS for validation steps (default 5000)
+    # FIXME and gpu num ?
     print("Template should have {} for the data paragraph, {} for the phon_type, "
           "'OUTDIR' for output directory, and VOCAB for vocab type", flush=True)
     # data strings
@@ -162,15 +190,16 @@ def main(args):
     emb_info = f'''src_embeddings: {embs_path}
 embeddings_type: "GloVe"'''
     # fill templates
-    full_conf_text = conf_temp_text.replace('OUTDIR', args.out_dir).replace(\
-            'EMBINFO', emb_info).replace('VOCAB', '').replace('WORDVECSIZE', str(\
-            args.emb_dim)).format(full_data_str, args.phon_type)
-    lang1_conf_text = conf_temp_text.replace('OUTDIR', args.out_dir).replace(\
-            'EMBINFO', emb_info).replace('VOCAB', '-'+args.src1_lang.upper()).replace(\
-            'WORDVECSIZE', str(args.emb_dim)).format(lang1_data_str, args.phon_type)
-    lang2_conf_text = conf_temp_text.replace('OUTDIR', args.out_dir).replace(\
-            'EMBINFO', emb_info).replace('VOCAB', '-'+args.src2_lang.upper()).replace(\
-            'WORDVECSIZE', str(args.emb_dim)).format(lang2_data_str, args.phon_type)
+    mostly_filled_temp = conf_temp_text.replace('OUTDIR', args.out_dir).replace(\
+            'EMBINFO', emb_info).replace('WORDVECSIZE', str(args.emb_dim)).replace(\
+            'SAVESTEPS', str(args.save_every)).replace('TRAINSTEPS', str(args.train_steps)).replace(\
+            'VALSTEPS', str(args.val_steps))
+    full_conf_text = mostly_filled_temp.replace('VOCAB', '').format(full_data_str,\
+            args.phon_type)
+    lang1_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src1_lang.upper()).format(\
+            lang1_data_str, args.phon_type)
+    lang2_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src2_lang.upper()).format(\
+            lang2_data_str, args.phon_type)
     # write yaml files
     # example: fr-ht/config/fr-ht-phon.yaml
     full_conf_fn, lang1_conf_fn, lang2_conf_fn = \
@@ -213,7 +242,7 @@ embeddings_type: "GloVe"'''
     joint_vocab_fn = vocab_fn_template.format('')
     if phon_bool:
         create_phon_embeds(lang1_vocab_fn, lang2_vocab_fn, joint_vocab_fn, args.src1_lang, \
-            args.src2_lang, embs_path, phon_info, args.emb_dim)
+            args.src2_lang, embs_path, phon_info, args.emb_dim, args.seed)
 
     # (7) Train model -------------------------------------------------------
     print("Training MT model....", flush=True)
@@ -222,19 +251,18 @@ embeddings_type: "GloVe"'''
     os.system(train_cmd)
     
     # (8) Evaluate and score ------------------------------------------------
-    # Find model path
+    # model dir to find model path
     mod_dir = os.path.join(args.out_dir, 'run', args.phon_type)
-    saved_models = os.listdir(models_dir)
-    evaluate(mod_dir=mod_dir, src_test_data, out_path, gpu_num, tgt_test_data,\
-            mod_num=args.model_eval_num)
+    # testing data for src1 only
+    src_test_data = f'{out_f1}.{args.src1_lang}.test'
+    tgt_test_data = f'{out_f1}.{args.tgt_lang}.test'
+    # output file for predictions
+    out_pred_tail = '{}-preds-{}.txt'.format(args.phon_type, args.test_len)
+    out_pred_file = os.path.join(args.out_dir, 'pred', out_pred_tail)
+    # Now we can evaluate
+    evaluate(mod_dir=mod_dir, src_test_data=src_test_data, out_path=out_pred_file, gpu_num=args.gpu_num, tgt_test_data=tgt_test_data, mod_num=args.model_eval_num)
+    
     return
-    print("Evaluating model saved at", flush=True)
-    '''onmt_translate -model fr-ht/run/base/model_step_100000.pt -src fr-ht/corpora/en-ht-15k.ht.test -output fr-ht/pred/base-preds-15k.txt -gpu 0 sacrebleu fr-ht/corpora/en-ht-15k.en.test -i fr-ht/pred/base-preds-15k.txt -m bleu'''
-    # Find model path
-    models_dir = os.path.join(args.out_dir, 'run', args.phon_type)
-    saved_models = os.listdir(models_dir)
-    # FIXME pick model to choose
-    eval_cmd_temp = 'onmt_translate -model {} -src fr-ht/corpora/en-ht-15k.ht.test -output fr-ht/pred/base-preds-15k.txt -gpu 0 sacrebleu fr-ht/corpora/en-ht-15k.en.test -i fr-ht/pred/base-preds-15k.txt -m bleu'
 
 
 if __name__=='__main__':
@@ -305,8 +333,20 @@ if __name__=='__main__':
     parser.add_argument('--gpu-num', type=int,
             help='which GPU to use',
             default=0)
+    parser.add_argument('--train-steps', type=int,
+            help='How many training steps',
+            default=60000)
+    parser.add_argument('--val-steps', type=int,
+            help='Validation steps (how often to validate)',
+            default=5000)
+    parser.add_argument('--save-every', type=int,
+            help='Save the model every how many steps',
+            default=30000)
     parser.add_argument('--model-eval-num', default='max',
             help='which model to test')
+    parser.add_argument("--seed", type=int,
+            default=sum(bytes(b'dragn')),
+            help="random seed, set to 0 for no seed")
 
     args = parser.parse_args()
 
@@ -316,5 +356,5 @@ if __name__=='__main__':
     python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 enht_haitian --tgt1 enht_english --src2 enfr_french --tgt2 enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512
     '''
     '''Or on patient:
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512 --train-steps 1000 --save-every 1000 --val-steps 250
     '''

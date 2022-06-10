@@ -1,13 +1,28 @@
 import numpy as np
 import epitran
 import panphon2
-ft = panphon2.FeatureTable()
-rand_fcn = np.random.random # FIXME
 
 import pdb
 import re
 
+ft = panphon2.FeatureTable()
+rand_fcn = np.random.random # FIXME
+
 PHON_EMB_LEN = len(ft.word_to_bag_of_features('b'))
+
+
+def seed_everything(seed=sum(bytes(b'dragn'))):
+    """
+    Helper function to set random seed
+    """
+    #random.seed(seed)
+    np.random.seed(seed)
+    #torch.manual_seed(seed)
+    #torch.cuda.manual_seed(seed)
+    #torch.cuda.manual_seed_all(seed)
+    #torch.backends.cudnn.benchmark = False
+    #torch.backends.cudnn.deterministic = True
+
 
 def pad_vec(vec, emb_dim, phon_info):
     phon_type, phon_pad, phon_gram = phon_info['type'], phon_info['pad'], phon_info['gram']
@@ -41,7 +56,12 @@ def default_emb(emb_dim, phon_info):
         raise NotImplementedError("Entered phonological embedding code but phon_type != 'phon'")
 
 
-def many_w2fv(wordlist, phon_info, epi_lang='hat-Latn-bab', emb_dim=512, ngram_size=3):
+def many_w2fv(wordlist, phon_info, epi_lang='hat-Latn-bab', emb_dim=512, ngram_size=3, seed=0):
+    """
+    """
+    if seed:
+        seed_everything(seed)
+
     print("Creating phonlogical embeddings from vocab list....", flush=True)
     epi = epitran.Epitran(epi_lang)
 

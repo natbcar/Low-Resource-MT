@@ -1,33 +1,33 @@
 import pickle as pkl
 import numpy as np
 import spacy
-# import en_core_web_sm
+#import en_core_web_sm
 import re
 import argparse
-from pythainlp.tokenize import word_tokenize as thai_word_tokenize
-from laonlp.tokenize import word_tokenize as lao_word_tokenize
-from trtokenizer.tr_tokenizer import WordTokenizer as TurkishWordTokenizer
+#from pythainlp.tokenize import word_tokenize as thai_word_tokenize
+#from laonlp.tokenize import word_tokenize as lao_word_tokenize
+#from trtokenizer.tr_tokenizer import WordTokenizer as TurkishWordTokenizer
 import pdb
 
-th_tokenizer = thai_word_tokenize
-lo_tokenizer = lao_word_tokenize
-tr_tokenizer = TurkishWordTokenizer()
-az_tokenizer = spacy.load('xx_ent_wiki_sm')
-ht_tokenizer = spacy.load('xx_ent_wiki_sm')
+#th_tokenizer = thai_word_tokenize
+#lo_tokenizer = lao_word_tokenize
+#tr_tokenizer = TurkishWordTokenizer()
+#az_tokenizer = spacy.load('xx_ent_wiki_sm')
+#ht_tokenizer = spacy.load('xx_ent_wiki_sm')
 
-def tokenize(sent, lang):
-    if lang == "tha":
-        return " ".join(th_tokenizer(sent)).strip('\n') + " \n"
-    elif lang == "lao":
-        return " ".join(lo_tokenizer(sent)).strip('\n') + " \n"
-    elif lang == "tur": # FIXME
-        return " ".join(tr_tokenizer.tokenize(sent)).strip('\n') + " \n"
-    elif lang == "aze":
-        return " ".join([tok.text for tok in az_tokenizer.tokenizer(sent)]).strip('\n') + " \n"
-    elif lang == "hat":
-        return " ".join([tok.text for tok in ht_tokenizer.tokenizer(sent)]).strip('\n') + " \n" 
-    elif lang == "fra":
-        return " ".join([tok.text for tok in ht_tokenizer.tokenizer(sent)]).strip('\n') + " \n"
+#def tokenize(sent, lang):
+#    if lang == "tha":
+#        return " ".join(th_tokenizer(sent)).strip('\n') + " \n"
+#    elif lang == "lao":
+#        return " ".join(lo_tokenizer(sent)).strip('\n') + " \n"
+#    elif lang == "tur": # FIXME
+#        return " ".join(tr_tokenizer.tokenize(sent)).strip('\n') + " \n"
+#    elif lang == "aze":
+#        return " ".join([tok.text for tok in az_tokenizer.tokenizer(sent)]).strip('\n') + " \n"
+#    elif lang == "hat":
+#        return " ".join([tok.text for tok in ht_tokenizer.tokenizer(sent)]).strip('\n') + " \n" 
+#    elif lang == "fra":
+#        return " ".join([tok.text for tok in ht_tokenizer.tokenizer(sent)]).strip('\n') + " \n"
 
 def clean(src_lines, tgt_lines, lang):    
     src_tok, tgt_tok = [], []
@@ -35,13 +35,13 @@ def clean(src_lines, tgt_lines, lang):
         if re.search('[a-zA-Z]', src_line) and lang in ["th", "lo"]:
             continue
         else:
-            # sent = " ".join(tokenizer(src_line))
-            sent = tokenize(src_line, lang)
-            try:
-                sent = re.sub("\u200b", "", sent)
-            except:
-                pdb.set_trace()
-            sent = re.sub(" +", " ", sent)
+            #sent = " ".join(tokenizer(src_line))
+            #sent = tokenize(src_line, lang)
+            #try:
+            #    sent = re.sub("\u200b", "", sent)
+            #except:
+            #    pdb.set_trace()
+            #sent = re.sub(" +", " ", sent)
             if sent.strip() != "" and tgt_line.strip() != "":
                 src_tok.append(sent)
                 tgt_tok.append(tgt_line)
@@ -49,16 +49,32 @@ def clean(src_lines, tgt_lines, lang):
     return src_tok, tgt_tok
 
 
+def seed_everything(seed=sum(bytes(b'dragn'))):
+    """
+    Helper function to set random seed
+    """
+    #random.seed(seed)
+    np.random.seed(seed)
+    #torch.manual_seed(seed)
+    #torch.cuda.manual_seed(seed)
+    #torch.cuda.manual_seed_all(seed)
+    #torch.backends.cudnn.benchmark = False
+    #torch.backends.cudnn.deterministic = True
+
+
 def write(lines, outfile):
     with open(outfile, "w") as f:
         f.writelines(lines)
 
 
-def main(src_file, tgt_file, out_file, lang, tgt_lang, train_len, val_len, test_len):
+def main(src_file, tgt_file, out_file, lang, tgt_lang, train_len, val_len, test_len, seed=0):
     with open(src_file, "r") as f:
         src = f.readlines()
     with open(tgt_file, "r") as f:
         tgt = f.readlines()
+
+    if seed:
+        seed_everything(seed)
 
     # shuffle
     indices = np.arange(len(src))
