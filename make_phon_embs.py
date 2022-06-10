@@ -1,6 +1,16 @@
 import argparse
 import numpy as np
+import pickle as pkl
 
+"""
+python3 make_phon_embs.py --emb-path ../translation/emb_dict_trans_featvec_tr_az_ngram.pkl --out-path tr-az/embeds/tr-az-phon-embs.txt
+python3 make_phon_embs.py --emb-path ../translation/emb_dict_trans_featvec_tr_az_ngram.pkl --out-path tr-az/embeds/tr-az-phon-cat-embs.txt --cat 1
+python3 make_phon_embs.py --emb-path ../translation/emb_dict_trans_featvec_th_lo_unigram.pkl --out-path th-lo/embeds/th-lo-phon-embs-sp.txt
+emb_dict_trans_featvec_th_lo_sp.pkl
+python3 make_phon_embs.py --emb-path ../translation/emb_dict_trans_featvec_th_lo_sp.pkl --out-path th-lo/embeds/th-lo-phon-embs-sp.txt
+emb_dict_trans_featvec_tr_az_unigram.pkl
+python3 make_phon_embs.py --emb-path ../translation/emb_dict_trans_featvec_tr_az_unigram.pkl --out-path tr-az/embeds/tr-az-phon-embs-sp.txt
+"""
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--emb-path",
@@ -31,13 +41,19 @@ if __name__ == "__main__":
             concat_emb_dict[k] = concat_emb
         
         for k, v in concat_emb_dict.items():
-            emb_str = " ".join([k.decode("utf-8")] + [str(float(digit)) for digit in v])
-            with open(outfile, "a") as f:
+            try:
+                emb_str = " ".join([k.decode("utf-8")] + [str(float(digit)) for digit in v])
+            except:
+                emb_str = " ".join([k] + [str(float(digit)) for digit in v])
+            with open(args.out_path, "a") as f:
                 f.write(emb_str+"\n")
         
     else:
         for k, v in emb_dict.items():
-            emb_str = " ".join([k.decode("utf-8")] + [str(float(digit)) for digit in v])
-            with open(args.out_path, "w") as f:
+            try:
+                emb_str = " ".join([k.decode("utf-8")] + [str(float(digit)) for digit in v])
+            except:
+                emb_str = " ".join([k] + [str(float(digit)) for digit in v])
+            with open(args.out_path, "a") as f:
                 f.write(emb_str+"\n")
             
