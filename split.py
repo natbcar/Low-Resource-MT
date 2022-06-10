@@ -35,6 +35,7 @@ def clean(src_lines, tgt_lines, lang):
         if re.search('[a-zA-Z]', src_line) and lang in ["th", "lo"]:
             continue
         else:
+            sent = src_line
             #sent = " ".join(tokenizer(src_line))
             #sent = tokenize(src_line, lang)
             #try:
