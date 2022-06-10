@@ -1,0 +1,62 @@
+# toy_en_de.yaml
+
+## Where the samples will be written
+save_data: OUTDIR/run/
+## Where the vocab(s) will be written
+src_vocab: OUTDIR/run/srcVOCAB.vocab
+tgt_vocab: OUTDIR/run/tgtVOCAB.vocab
+
+# # Prevent overwriting existing files in the folder
+overwrite: True
+
+# Corpus opts:
+{}
+
+# Random seed
+seed: 42
+
+# Vocabulary files that were just created
+src_vocab: OUTDIR/run/srcVOCAB.vocab
+tgt_vocab: OUTDIR/run/tgtVOCAB.vocab
+
+EMBINFO
+
+# early stopping
+early_stopping: 5
+early_stopping_criteria: accuracy
+
+# Train on a single GPU
+# do export CUDA_VISIBLE_DEVICES= (gpu num)
+world_size: 1
+gpu_ranks: [0]
+
+# Optimization
+model_dtype: "fp32"
+optim: "adam"
+learning_rate: 3
+valid_batch_size: 1024
+decay_method: "noam"
+batch_size: 1024
+batch_type: tokens
+normalization: tokens
+label_smoothing: 0.1
+
+# Model
+encoder_type: transformer
+decoder_type: transformer
+position_encoding: true
+enc_layers: 6
+dec_layers: 6
+heads: 8
+rnn_size: 512
+word_vec_size: WORDVECSIZE
+transformer_ff: 2048
+dropout_steps: [0]
+dropout: [0.1]
+attention_dropout: [0.1]
+
+# Where to save the checkpoints
+save_model: OUTDIR/run/{}/model
+save_checkpoint_steps: 30000
+train_steps: 60000
+valid_steps: 5000

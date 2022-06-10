@@ -1,0 +1,8 @@
+torch==1.7.1
+torchtext==0.5.0
+spacy
+pythainlp
+laonlp
+trtokenizer
+panphon2
+epitran
