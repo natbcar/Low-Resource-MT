@@ -192,7 +192,7 @@ embeddings_type: "GloVe"'''
     # fill templates
     mostly_filled_temp = conf_temp_text.replace('OUTDIR', args.out_dir).replace(\
             'EMBINFO', emb_info).replace('WORDVECSIZE', str(args.emb_dim)).replace(\
-            'SAVESTEPS', str(args.save_every)).replace('TRAINSTEPS', str(args.train_steps)).replace(\
+            'SAVESTEPS', str(args.save_steps)).replace('TRAINSTEPS', str(args.train_steps)).replace(\
             'VALSTEPS', str(args.val_steps))
     full_conf_text = mostly_filled_temp.replace('VOCAB', '').format(full_data_str,\
             args.phon_type)
@@ -341,7 +341,7 @@ if __name__=='__main__':
     parser.add_argument('--val-steps', type=int,
             help='Validation steps (how often to validate)',
             default=5000)
-    parser.add_argument('--save-every', type=int,
+    parser.add_argument('--save-steps', type=int,
             help='Save the model every how many steps',
             default=30000)
     parser.add_argument('--model-eval-num', default='max',
@@ -358,5 +358,5 @@ if __name__=='__main__':
     python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 enht_haitian --tgt1 enht_english --src2 enfr_french --tgt2 enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512
     '''
     '''Or on patient:
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512 --train-steps 1000 --save-every 1000 --val-steps 250
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250
     '''
