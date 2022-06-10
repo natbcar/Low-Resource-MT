@@ -10,17 +10,35 @@ import re
 PHON_EMB_LEN = len(ft.word_to_bag_of_features('b'))
 
 def pad_vec(vec, emb_dim, phon_info):
+    phon_type, phon_pad, phon_gram = phon_info['type'], phon_info['pad'], phon_info['gram']
     if phon_type == 'phon':
-        return vec + list(rand_fcn(emb_dim - len(vec)))
+        if phon_pad == 'rand':
+            return vec + list(rand_fcn(emb_dim - len(vec))) # FIXME there is a better way 
+        elif phon_pad == 'cat':
+            num_repeats = emb_dim // len(vec)
+            remainder = emb_dim % len(vec)
+            return (vec * num_repeats) + vec[:remainder]
+        elif phon_pad == 'zero':
+            return vec + ([0] * emb_dim)
+        else:
+            raise NotImplementedError("Phon padding str not in {'cat', 'rand', 'zero'}")
     else:
-        raise NotImplementedError # FIXME 
+        raise NotImplementedError("Entered phonological embedding code but phon_type != 'phon'")
 
 
 def default_emb(emb_dim, phon_info):
+    phon_type, phon_pad, phon_gram = phon_info['type'], phon_info['pad'], phon_info['gram']
     if phon_type == 'phon':
-        return list(rand_fcn(emb_dim))
+        if phon_pad == 'rand':
+            return list(rand_fcn(emb_dim)) # FIXME there is a better way
+        elif phon_pad == 'cat':
+            return [0] * emb_dim # Is there a better way?
+        elif phon_pad == 'zero':
+            return [0] * emb_dim
+        else:
+            raise NotImplementedError("Phon padding str not in {'cat', 'rand', 'zero'}")
     else:
-        raise NotImplementedError # FIXME
+        raise NotImplementedError("Entered phonological embedding code but phon_type != 'phon'")
 
 
 def many_w2fv(wordlist, phon_info, epi_lang='hat-Latn-bab', emb_dim=512, ngram_size=3):

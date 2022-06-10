@@ -40,7 +40,7 @@ def create_phon_embeds(lang1_vocab_fn, lang2_vocab_fn, joint_vocab_fn, lang1, la
     lang1_vocab = extract_vocab(lang1_vocab_fn)
     lang2_vocab = extract_vocab(lang2_vocab_fn)
     joint_vocab = extract_vocab(joint_vocab_fn)
-    ngram_size = 3 # FIXME
+    ngram_size = phon_info['gram']
     emb_dict1 = fv.many_w2fv(wordlist=lang1_vocab, phon_info=phon_info, epi_lang=EPITRAN_LANGS[lang1],\
             emb_dim=emb_dim, ngram_size=ngram_size)
     emb_dict2 = fv.many_w2fv(wordlist=lang2_vocab, phon_info=phon_info, epi_lang=EPITRAN_LANGS[lang2],\
@@ -236,12 +236,12 @@ if __name__=='__main__':
             required=True)
     parser.add_argument('--phon-pad', type=str,
             help='How to pad phonological embeddings?',
-            choices=['concat', 'random', 'zero'],
+            choices=['cat', 'rand', 'zero'],
             default='random')
-    parser.add_argument('--phon-gram', type=str,
-            help='Organize phon embeddings via ngrams or unigrams?',
-            choices=['unigram', 'ngram'],
-            default='unigram')
+    parser.add_argument('--phon-gram', type=int,
+            help='Organize phon embeddings via ngrams or unigrams? '
+            'For unigrams, set to 1; for ngrams, set to n',
+            default=3)
     parser.add_argument('--src1', type=str,
             help='Bi-text file for first source language (LRL, testing language)',
             required=True)
@@ -293,5 +293,5 @@ if __name__=='__main__':
     main(args)
 
     '''Example usage:
-    python3 mt.py --out-dir test-test --phon-type phon --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 300
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512
     '''
