@@ -202,10 +202,11 @@ embeddings_type: "GloVe"'''
             lang2_data_str, args.phon_type)
     # write yaml files
     # example: fr-ht/config/fr-ht-phon.yaml
+    out_dir_tail = os.path.split(args.out_dir)[-1]
     full_conf_fn, lang1_conf_fn, lang2_conf_fn = \
-      f'{args.out_dir}/config/{args.out_dir}-{args.phon_type}.yaml',\
-      f'{args.out_dir}/config/{args.out_dir}-{args.phon_type}-{args.src1_lang.upper()}.yaml',\
-      f'{args.out_dir}/config/{args.out_dir}-{args.phon_type}-{args.src2_lang.upper()}.yaml'
+      f'{args.out_dir}/config/{out_dir_tail}-{args.phon_type}.yaml',\
+      f'{args.out_dir}/config/{out_dir_tail}-{args.phon_type}-{args.src1_lang.upper()}.yaml',\
+      f'{args.out_dir}/config/{out_dir_tail}-{args.phon_type}-{args.src2_lang.upper()}.yaml' # FIXME os.path.join
     # Write config files
     with open(full_conf_fn, 'w') as f:
         f.write(full_conf_text)
@@ -236,7 +237,7 @@ embeddings_type: "GloVe"'''
         os.system(lang2_vocab_cmd)
 
     # (6) Create embeddings -------------------------------------------------
-    vocab_fn_template = args.out_dir + '/run/src{}.vocab'
+    vocab_fn_template = args.out_dir + '/run/src{}.vocab' # FIXME os.path.join
     lang1_vocab_fn = vocab_fn_template.format('-'+args.src1_lang.upper())
     lang2_vocab_fn = vocab_fn_template.format('-'+args.src2_lang.upper())
     joint_vocab_fn = vocab_fn_template.format('')
@@ -260,7 +261,8 @@ embeddings_type: "GloVe"'''
     out_pred_tail = '{}-preds-{}.txt'.format(args.phon_type, args.test_len)
     out_pred_file = os.path.join(args.out_dir, 'pred', out_pred_tail)
     # Now we can evaluate
-    evaluate(mod_dir=mod_dir, src_test_data=src_test_data, out_path=out_pred_file, gpu_num=args.gpu_num, tgt_test_data=tgt_test_data, mod_num=args.model_eval_num)
+    evaluate(mod_dir=mod_dir, src_test_data=src_test_data, out_path=out_pred_file,\
+            gpu_num=args.gpu_num, tgt_test_data=tgt_test_data, mod_num=args.model_eval_num)
     
     return
 
