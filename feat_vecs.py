@@ -11,7 +11,7 @@ rand_fcn = np.random.random # FIXME
 PHON_EMB_LEN = len(ft.word_to_bag_of_features('b'))
 
 
-def seed_everything(seed=sum(bytes(b'dragn'))):
+def seed_everything(seed: int=sum(bytes(b'dragn'))) -> None:
     """
     Helper function to set random seed
     """
@@ -24,7 +24,10 @@ def seed_everything(seed=sum(bytes(b'dragn'))):
     #torch.backends.cudnn.deterministic = True
 
 
-def pad_vec(vec, emb_dim, phon_info):
+def pad_vec(vec: list, emb_dim: int, phon_info: dict) -> list:
+    """
+    Helper function: pad vector to match embedding dimension
+    """
     phon_type, phon_pad, ngram_size = phon_info['type'], phon_info['pad'], phon_info['gram']
     if phon_type == 'phon':
         if phon_pad == 'rand':
@@ -41,7 +44,10 @@ def pad_vec(vec, emb_dim, phon_info):
         raise NotImplementedError("Entered phonological embedding code but phon_type != 'phon'")
 
 
-def default_emb(emb_dim, phon_info):
+def default_emb(emb_dim: int, phon_info: dict) -> list:
+    """
+    Helper function: gives default embedding when ordinary embedding methods fail
+    """
     phon_type, phon_pad, ngram_size = phon_info['type'], phon_info['pad'], phon_info['gram']
     if phon_type == 'phon':
         if phon_pad == 'rand':
@@ -56,8 +62,26 @@ def default_emb(emb_dim, phon_info):
         raise NotImplementedError("Entered phonological embedding code but phon_type != 'phon'")
 
 
-def many_w2fv(wordlist, phon_info, epi_lang='hat-Latn-bab', emb_dim=512, seed=0):
+def many_w2fv(wordlist: list[str], phon_info: dict, epi_lang: str='hat-Latn-bab', emb_dim: int=512,\
+        seed: int=0) -> dict:
     """
+    This function acceps a vocab list and produces phonological feature vector embeddings for 
+    each word. Each word is first transliterated to IPA using epitran. Then the IPA phones are
+    converted to feature vectors using panphon2 and combined in a way dictated by the
+    phonological info param. The function returns a dict mapping words to their embeddings.
+
+    Params:
+        wordlist (list[str]): vocab list
+        phon_info (dict[str, str]): info for combining phon embeddings
+            Keys:
+                'type': indicates whether to use phonological embeddings
+                'pad': indicates manner of padding embeddings ('rand' method tailored to ONMT)
+                'gram': length of ngrams for embedding concatenation
+        epi_lang (str): language setting for epitran transliteration
+        emb_dim (int): embedding dimension
+        seed (int): seed for random processes (not currently implemented)
+    Returns:
+        emb_dict (dict): dict mapping vocab words in wordlist to padded phon embedding vectors
     """
     # seed random processes (if necessary)
     if seed:
@@ -132,8 +156,14 @@ def many_w2fv(wordlist, phon_info, epi_lang='hat-Latn-bab', emb_dim=512, seed=0)
     return emb_dict
 
 
-def write_emb(wordlist, emb_dict, out_file):
+def write_emb(wordlist: list, emb_dict: dict, out_file: str) -> None:
     """
+    Writes embeddings from a dictionary to a file in GloVe embedding format
+    
+    Params:
+        wordlist (list): vocab list. Should be the same as emb_dict.keys() but in order of frequency
+        emb_dict (dict): mapping vocab words to phon embeddings, output of many_w2fv
+        out_file (str): file to write embeddings to
     """
     assert len(wordlist) == len(emb_dict)
     # Format embedding strings
@@ -151,6 +181,8 @@ def write_emb(wordlist, emb_dict, out_file):
 
 def make_emb_from_info(wordlist, out_file, phon_info, epi_lang='hat-Latn-bab', emb_dim=512, ngram_size=3):
     """
+    Function to write embeddings directly from wordlist, out_file, phon_info, etc. Not used in current
+    program
     """
     emb_dict = many_w2fv(wordlist, phon_info, epi_lang, emb_dim, ngram_size)
     assert len(wordlist) == len(emb_dict)
