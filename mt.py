@@ -78,8 +78,8 @@ def create_phon_embeds(lang1_vocab_fn: str, lang2_vocab_fn: str, joint_vocab_fn:
     print("Embeddings written successfully to", emb_fn, flush=True)
 
 
-def create_dirs(out_dir: str, out_dir_list: list=['corpora', 'pred', 'embeds', 'run', 'config']) \
-        -> None:
+def create_dirs(out_dir: str, out_dir_list: list=['corpora', 'pred', 'embeds', 'mod', 'vocab',\
+        'config', 'spm']) -> None:
     """
     Helper function to create directories using os.mkdir
 
@@ -175,7 +175,7 @@ def main(args):
     args.src2_lang = LANG_REGULARIZER[args.src2_lang.lower()]
     args.tgt_lang = LANG_REGULARIZER[args.tgt_lang.lower()]
 
-    # (2) Create directories -----------------------------------------------
+    # (2) Create directories ------------------------------------------------
     create_dirs(out_dir=args.out_dir)
 
     # (3) Split data using split.py -----------------------------------------
@@ -197,7 +197,10 @@ def main(args):
             lang=args.src2_lang, tgt_lang=args.tgt_lang, train_len=args.train2_len, \
             val_len=args.val_len, test_len=args.test_len)
 
-    # (4) Construct config files --------------------------------------------
+    # (4) Tokenize text using sentencepiece ---------------------------------
+    # komya
+
+    # (5) Construct config files --------------------------------------------
     print("Opening config template", flush=True)
     with open(args.config_temp, 'r') as f:
         conf_temp_text = f.read()
@@ -271,7 +274,7 @@ embeddings_type: "GloVe"'''
     else:
         print(f"Config *.yaml file written to {full_conf_fn}", flush=True)
 
-    # (5) Construct vocab ---------------------------------------------------
+    # (6) Construct vocab ---------------------------------------------------
     vocab_cmd_temp = "onmt_build_vocab -config {} -n_sample -1"
     # joint vocab
     joint_vocab_cmd = vocab_cmd_temp.format(full_conf_fn)
@@ -287,8 +290,8 @@ embeddings_type: "GloVe"'''
         print("Executing:", lang2_vocab_cmd, flush=True)
         os.system(lang2_vocab_cmd)
 
-    # (6) Create embeddings -------------------------------------------------
-    vocab_fn_template = os.path.join(args.out_dir, 'run', 'src{}.vocab')
+    # (7) Create embeddings -------------------------------------------------
+    vocab_fn_template = os.path.join(args.out_dir, 'vocab', 'src{}.vocab')
     lang1_vocab_fn = vocab_fn_template.format('-'+args.src1_lang.upper())
     lang2_vocab_fn = vocab_fn_template.format('-'+args.src2_lang.upper())
     joint_vocab_fn = vocab_fn_template.format('')
@@ -297,15 +300,15 @@ embeddings_type: "GloVe"'''
                 joint_vocab_fn=joint_vocab_fn, lang1=args.src1_lang, lang2=args.src2_lang,\
                 emb_fn=embs_path, phon_info=phon_info, emb_dim=args.mod_dim, seed=args.seed)
 
-    # (7) Train model -------------------------------------------------------
+    # (8) Train model -------------------------------------------------------
     print("Training MT model....", flush=True)
     train_cmd = f'onmt_train -config {full_conf_fn}'
     print('\trunning', train_cmd, flush=True)
     os.system(train_cmd)
     
-    # (8) Evaluate and score ------------------------------------------------
+    # (9) Evaluate and score ------------------------------------------------
     # model dir to find model path
-    mod_dir = os.path.join(args.out_dir, 'run', args.phon_type)
+    mod_dir = os.path.join(args.out_dir, 'mod', args.phon_type)
     # testing data for src1 only
     src_test_data = f'{out_f1}.{args.src1_lang}.test'
     tgt_test_data = f'{out_f1}.{args.tgt_lang}.test'
