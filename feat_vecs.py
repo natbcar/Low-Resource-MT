@@ -25,16 +25,16 @@ def seed_everything(seed=sum(bytes(b'dragn'))):
 
 
 def pad_vec(vec, emb_dim, phon_info):
-    phon_type, phon_pad, phon_gram = phon_info['type'], phon_info['pad'], phon_info['gram']
+    phon_type, phon_pad, ngram_size = phon_info['type'], phon_info['pad'], phon_info['gram']
     if phon_type == 'phon':
         if phon_pad == 'rand':
-            return vec + list(rand_fcn(emb_dim - len(vec))) # FIXME there is a better way 
+            return vec + [0] * ((PHON_EMB_LEN * ngram_size) - len(vec)) # + list(rand_fcn(emb_dim - len(vec))) 
         elif phon_pad == 'cat':
             num_repeats = emb_dim // len(vec)
             remainder = emb_dim % len(vec)
             return (vec * num_repeats) + vec[:remainder]
         elif phon_pad == 'zero':
-            return vec + ([0] * emb_dim)
+            return vec + ([0] * (emb_dim - len(vec)))
         else:
             raise NotImplementedError("Phon padding str not in {'cat', 'rand', 'zero'}")
     else:
@@ -42,10 +42,10 @@ def pad_vec(vec, emb_dim, phon_info):
 
 
 def default_emb(emb_dim, phon_info):
-    phon_type, phon_pad, phon_gram = phon_info['type'], phon_info['pad'], phon_info['gram']
+    phon_type, phon_pad, ngram_size = phon_info['type'], phon_info['pad'], phon_info['gram']
     if phon_type == 'phon':
         if phon_pad == 'rand':
-            return list(rand_fcn(emb_dim)) # FIXME there is a better way
+            return [0] * PHON_EMB_LEN * ngram_size # Is there a better way?
         elif phon_pad == 'cat':
             return [0] * emb_dim # Is there a better way?
         elif phon_pad == 'zero':
@@ -56,11 +56,14 @@ def default_emb(emb_dim, phon_info):
         raise NotImplementedError("Entered phonological embedding code but phon_type != 'phon'")
 
 
-def many_w2fv(wordlist, phon_info, epi_lang='hat-Latn-bab', emb_dim=512, ngram_size=3, seed=0):
+def many_w2fv(wordlist, phon_info, epi_lang='hat-Latn-bab', emb_dim=512, seed=0):
     """
     """
+    # seed random processes (if necessary)
     if seed:
         seed_everything(seed)
+    # Set ngram size
+    ngram_size = phon_info['gram']
 
     print("Creating phonlogical embeddings from vocab list....", flush=True)
     epi = epitran.Epitran(epi_lang)
@@ -125,6 +128,7 @@ def many_w2fv(wordlist, phon_info, epi_lang='hat-Latn-bab', emb_dim=512, ngram_s
                 padded = pad_vec(vec, emb_dim, phon_info)
             emb_dict[word] = padded
     print("Created phonological embeddings", flush=True)
+    # pdb.set_trace()
     return emb_dict
 
 

@@ -61,15 +61,16 @@ def create_phon_embeds(lang1_vocab_fn: str, lang2_vocab_fn: str, joint_vocab_fn:
         emb_dim (int): embedding dimension
         seed (int): random seed for code in feat_vecs (fv) module
     """
+    # Extract vocab lists
     lang1_vocab = extract_vocab(lang1_vocab_fn)
     lang2_vocab = extract_vocab(lang2_vocab_fn)
     joint_vocab = extract_vocab(joint_vocab_fn)
-    ngram_size = phon_info['gram']
+    # Create embeddings using fv.many_w2fv
     emb_dict1 = fv.many_w2fv(wordlist=lang1_vocab, phon_info=phon_info, epi_lang=EPITRAN_LANGS[lang1],\
-            emb_dim=emb_dim, ngram_size=ngram_size, seed=seed)
+            emb_dim=emb_dim, seed=seed)
     emb_dict2 = fv.many_w2fv(wordlist=lang2_vocab, phon_info=phon_info, epi_lang=EPITRAN_LANGS[lang2],\
-            emb_dim=emb_dim, ngram_size=ngram_size, seed=seed)
-    # Combine dictionaries
+            emb_dim=emb_dim, seed=seed)
+    # Combine embedding dictionaries
     for key in emb_dict1:
         emb_dict2[key] = emb_dict1[key]
     # Write embeds to file
@@ -207,6 +208,8 @@ def main(args):
     #   and SAVESTEPS for save checkpoint steps (default 30000)
     #   and TRAINSTEPS for training steps (default 60000)
     #   and VALSTEPS for validation steps (default 5000)
+    #   and MODDIM for model dimension (should be 512)
+    #   and BIGMODDIM for transformer_ff (using 4 times model dimension, or 2048) 
     # FIXME and gpu num ?
     print("Template should have {} for the data paragraph, {} for the phon_type, "
           "'OUTDIR' for output directory, and VOCAB for vocab type", flush=True)
@@ -239,7 +242,8 @@ embeddings_type: "GloVe"'''
     #   general replacements
     mostly_filled_temp = conf_temp_text.replace('OUTDIR', args.out_dir).replace(\
             'EMBINFO', emb_info).replace('SAVESTEPS', str(args.save_steps)).replace(\
-            'TRAINSTEPS', str(args.train_steps)).replace('VALSTEPS', str(args.val_steps))
+            'TRAINSTEPS', str(args.train_steps)).replace('VALSTEPS', str(args.val_steps)\
+            ).replace('BIGMODDIM', str(4 * args.mod_dim)).replace('MODDIM', str(args.mod_dim))
     #   specific replacements
     full_conf_text = mostly_filled_temp.replace('VOCAB', '').format(full_data_str,\
             args.phon_type)
@@ -291,7 +295,7 @@ embeddings_type: "GloVe"'''
     if phon_bool:
         create_phon_embeds(lang1_vocab_fn=lang1_vocab_fn, lang2_vocab_fn=lang2_vocab_fn,\
                 joint_vocab_fn=joint_vocab_fn, lang1=args.src1_lang, lang2=args.src2_lang,\
-                emb_fn=embs_path, phon_info=phon_info, emb_dim=args.emb_dim, seed=args.seed)
+                emb_fn=embs_path, phon_info=phon_info, emb_dim=args.mod_dim, seed=args.seed)
 
     # (7) Train model -------------------------------------------------------
     print("Training MT model....", flush=True)
@@ -375,10 +379,10 @@ if __name__=='__main__':
             help='File for config template',
             default='config_template')
     parser.add_argument('--embeds-file', type=str,
-            help='embeddings file name',
+            help='file name to write embeddings to (just file name, not full path)',
             default='phon_embeddings')
-    parser.add_argument('--emb-dim', type=int,
-            help='model dimension',
+    parser.add_argument('--mod-dim', type=int,
+            help='model dimension - We want to keep this at 512',
             default=512)
     parser.add_argument('--gpu-num', type=int,
             help='which GPU to use',
@@ -407,4 +411,5 @@ if __name__=='__main__':
     '''
     '''Or on patient:
     python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250
     '''
