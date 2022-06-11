@@ -28,8 +28,14 @@ EPITRAN_LANGS = {
         }
 
 
-def extract_vocab(fn):
+def extract_vocab(fn: str) -> list[str]:
     """
+    Helper function: extract vocab list from vocab file
+
+    Params:
+        fn (str): file name
+    Returns:
+        vocab (list[str]): list of vocab words
     """
     with open(fn, 'r') as f:
         lines = f.readlines()
@@ -37,9 +43,23 @@ def extract_vocab(fn):
     return vocab
 
 
-def create_phon_embeds(lang1_vocab_fn, lang2_vocab_fn, joint_vocab_fn, lang1, lang2, emb_fn, phon_info,\
-        emb_dim, seed): # FIXME add types
+def create_phon_embeds(lang1_vocab_fn: str, lang2_vocab_fn: str, joint_vocab_fn: str, lang1: str,\
+        lang2: str, emb_fn: str, phon_info: dict, emb_dim: int, seed: int):
     """
+    Accept needed strings to create phonological embeddings. This function calls fv.many_w2fv
+    to construct embeddings dictionaries for each of the source languages. It then combines
+    the dictionaries and writes embeddings to an out file by calling fv.write_emb.
+
+    Params:
+        lang1_vocab_fn (str): path to vocab file for 1st source language (LRL/testing lang)
+        lang2_vocab_fn (str): path to vocab file for 2nd source language (HRL/transfer lang)
+        joint_vocab_fn (str): path to full vocab file for all source lang's
+        lang1 (str): 3-letter language code for 1st source lang (LRL/testing lang)
+        lang2 (str): 3-letter language code for 2nd source lang (HRL/transfer lang)
+        emb_fn (str): output file to write embeddings to
+        phon_info (dict): info dict for phon embedding types (passed in as flag args)
+        emb_dim (int): embedding dimension
+        seed (int): random seed for code in feat_vecs (fv) module
     """
     lang1_vocab = extract_vocab(lang1_vocab_fn)
     lang2_vocab = extract_vocab(lang2_vocab_fn)
@@ -57,8 +77,14 @@ def create_phon_embeds(lang1_vocab_fn, lang2_vocab_fn, joint_vocab_fn, lang1, la
     print("Embeddings written successfully to", emb_fn, flush=True)
 
 
-def create_dirs(out_dir, out_dir_list=['corpora', 'pred', 'embeds', 'run', 'config']):
+def create_dirs(out_dir: str, out_dir_list: list=['corpora', 'pred', 'embeds', 'run', 'config']) \
+        -> None:
     """
+    Helper function to create directories using os.mkdir
+
+    Params:
+        out_dir (str): main dir to be made
+        out_dir_list (list[str]): subdir's to be made
     """
     print("Creating all out directories", flush=True)
     # main dir
@@ -71,10 +97,25 @@ def create_dirs(out_dir, out_dir_list=['corpora', 'pred', 'embeds', 'run', 'conf
         if not os.path.exists(dir_):
             os.mkdir(dir_)
     print(f"\tdirectories now exist for {out_dir_list}", flush=True)
+    return
 
 
-def evaluate(mod_dir, src_test_data, out_path, gpu_num, tgt_test_data, mod_num='max'):
+def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_test_data: str,\
+        mod_num='max') -> None:
     """
+    Function to evaluate translation, given references and a trained model (to produce predicted
+    hypotheses). Translation scores are printed to the terminal.
+
+    Params:
+        mod_dir (str): directory containing trained models
+        src_test_data (str): path to 1st source lang testing sentences (LRL testing data) - 
+            to be translated into hypotheses
+        out_path (str): path to write hyptheses to
+        gpu_num (int): which GPU to use for translation?
+        tgt_test_data (str): path to reference translations in target language paired with
+            sentences in src_test_data
+        mod_num (=='max' or int): which model iteration to use? Set equal to the desired 
+            iteration number or to 'max' to test the latest saved model
     """
     # Find model path
     saved_models = os.listdir(mod_dir)
@@ -90,7 +131,7 @@ def evaluate(mod_dir, src_test_data, out_path, gpu_num, tgt_test_data, mod_num='
         raise ValueError("Invalid model number {} with saved models {}".format(\
                 chosen_mod_num, saved_models))
     mod_path = os.path.join(mod_dir, mod_path_tail)
-    # Now evaluate via onmt command
+    # Now translate via onmt command and evaluate (with sacrebleu)
     print("Evaluating model saved at", mod_path, flush=True)
     eval_cmd_temp = 'onmt_translate -model {} -src {} -output {} -gpu {}'
     bleu_cmd_temp = 'sacrebleu {} -i {} -m bleu'
@@ -99,12 +140,17 @@ def evaluate(mod_dir, src_test_data, out_path, gpu_num, tgt_test_data, mod_num='
     eval_cmd = eval_cmd_temp.format(mod_path, src_test_data, out_path, gpu_num)
     print("\trunning command:", eval_cmd, flush=True)
     os.system(eval_cmd)
-    # then score
+    # then score - BLEU
     bleu_cmd = bleu_cmd_temp.format(tgt_test_data, out_path)
     print("\trunning command:", bleu_cmd, flush=True)
     os.system(bleu_cmd)
-    # komya chrf
+    # and chrF++
+    chrf_cmd = chrf_cmd_temp.format(tgt_test_data, out_path)
+    print("\trunning command:", chrf_cmd, flush=True)
+    os.system(chrf_cmd)
+    # finished eval
     print("\teval done", flush=True)
+    return
 
 
 def main(args):
@@ -112,7 +158,8 @@ def main(args):
     args:
         out_dir, phon_type, src1, tgt1, src2, tgt2, src1_lang, src2_lang, 
         tgt_lang, train1_len, train2_len, val_len, test_len, config_temp,
-        embeds_file, emb_dim, gpu_num
+        embeds_file, emb_dim, gpu_num 
+        (See 'help' descriptions below)
     """
     
     # (1) Preliminary steps ------------------------------------------------
@@ -157,7 +204,6 @@ def main(args):
     #   and replace OUTDIR with args.out_dir
     #   and VOCAB with vocab type
     #   and EMBINFO for embeddings info
-    #   and WORDVECSIZE for emb dim
     #   and SAVESTEPS for save checkpoint steps (default 30000)
     #   and TRAINSTEPS for training steps (default 60000)
     #   and VALSTEPS for validation steps (default 5000)
@@ -189,11 +235,12 @@ def main(args):
     # embedding string
     emb_info = f'''src_embeddings: {embs_path}
 embeddings_type: "GloVe"'''
-    # fill templates
+    # fill templates: Need config files for training and for each source lang vocab
+    #   general replacements
     mostly_filled_temp = conf_temp_text.replace('OUTDIR', args.out_dir).replace(\
-            'EMBINFO', emb_info).replace('WORDVECSIZE', str(args.emb_dim)).replace(\
-            'SAVESTEPS', str(args.save_steps)).replace('TRAINSTEPS', str(args.train_steps)).replace(\
-            'VALSTEPS', str(args.val_steps))
+            'EMBINFO', emb_info).replace('SAVESTEPS', str(args.save_steps)).replace(\
+            'TRAINSTEPS', str(args.train_steps)).replace('VALSTEPS', str(args.val_steps))
+    #   specific replacements
     full_conf_text = mostly_filled_temp.replace('VOCAB', '').format(full_data_str,\
             args.phon_type)
     lang1_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src1_lang.upper()).format(\
@@ -204,9 +251,9 @@ embeddings_type: "GloVe"'''
     # example: fr-ht/config/fr-ht-phon.yaml
     out_dir_tail = os.path.split(args.out_dir)[-1]
     full_conf_fn, lang1_conf_fn, lang2_conf_fn = \
-      f'{args.out_dir}/config/{out_dir_tail}-{args.phon_type}.yaml',\
-      f'{args.out_dir}/config/{out_dir_tail}-{args.phon_type}-{args.src1_lang.upper()}.yaml',\
-      f'{args.out_dir}/config/{out_dir_tail}-{args.phon_type}-{args.src2_lang.upper()}.yaml' # FIXME os.path.join
+      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{args.phon_type}.yaml'),\
+      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{args.phon_type}-{args.src1_lang.upper()}.yaml'),\
+      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{args.phon_type}-{args.src2_lang.upper()}.yaml')
     # Write config files
     with open(full_conf_fn, 'w') as f:
         f.write(full_conf_text)
@@ -237,13 +284,14 @@ embeddings_type: "GloVe"'''
         os.system(lang2_vocab_cmd)
 
     # (6) Create embeddings -------------------------------------------------
-    vocab_fn_template = args.out_dir + '/run/src{}.vocab' # FIXME os.path.join
+    vocab_fn_template = os.path.join(args.out_dir, 'run', 'src{}.vocab')
     lang1_vocab_fn = vocab_fn_template.format('-'+args.src1_lang.upper())
     lang2_vocab_fn = vocab_fn_template.format('-'+args.src2_lang.upper())
     joint_vocab_fn = vocab_fn_template.format('')
     if phon_bool:
-        create_phon_embeds(lang1_vocab_fn, lang2_vocab_fn, joint_vocab_fn, args.src1_lang, \
-            args.src2_lang, embs_path, phon_info, args.emb_dim, args.seed)
+        create_phon_embeds(lang1_vocab_fn=lang1_vocab_fn, lang2_vocab_fn=lang2_vocab_fn,\
+                joint_vocab_fn=joint_vocab_fn, lang1=args.src1_lang, lang2=args.src2_lang,\
+                emb_fn=embs_path, phon_info=phon_info, emb_dim=args.emb_dim, seed=args.seed)
 
     # (7) Train model -------------------------------------------------------
     print("Training MT model....", flush=True)
