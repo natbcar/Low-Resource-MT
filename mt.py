@@ -133,8 +133,24 @@ def encode_spm(spm_model: str, text_file: str) -> None:
     return
 
 
+def decode_spm(spm_model: str, text_file: str) -> None:
+    """
+    """
+    sp = spm.SentencePieceProcessor(model_file=spm_model)
+    with open(text_file, 'r') as f:
+        lines = f.readlines()
+    split_lines = [line.strip().split(' ') for line in lines]
+    decodings = sp.decode(split_lines)
+    decoded_lines = [decoding + '\n' for decoding in decodings]
+    out_file = text_file + '.decode'
+    with open(out_file, 'w') as f:
+        f.writelines(decoded_lines)
+    print("Written decoded output to", out_file, flush=True)
+    return
+
+
 def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_test_data: str,\
-        mod_num='max') -> None:
+        mod_num='max', decode_mod=None) -> None:
     """
     Function to evaluate translation, given references and a trained model (to produce predicted
     hypotheses). Translation scores are printed to the terminal.
@@ -173,12 +189,19 @@ def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_
     eval_cmd = eval_cmd_temp.format(mod_path, src_test_data, out_path, gpu_num)
     print("\trunning command:", eval_cmd, flush=True)
     os.system(eval_cmd)
+    print("\tsaved hypotheses to", out_path, flush=True)
+    if decode_mod:
+        # second, before scoring we may have to decode
+        decode_spm(spm_model=decode_mod, text_file=out_path)
+        hyp_file = out_path + '.decode' # FIXME make this the output of decode_spm
+    else:
+        hyp_file = out_path
     # then score - BLEU
-    bleu_cmd = bleu_cmd_temp.format(tgt_test_data, out_path)
+    bleu_cmd = bleu_cmd_temp.format(tgt_test_data, hyp_file)
     print("\trunning command:", bleu_cmd, flush=True)
     os.system(bleu_cmd)
     # and chrF++
-    chrf_cmd = chrf_cmd_temp.format(tgt_test_data, out_path)
+    chrf_cmd = chrf_cmd_temp.format(tgt_test_data, hyp_file)
     print("\trunning command:", chrf_cmd, flush=True)
     os.system(chrf_cmd)
     # finished eval
@@ -235,17 +258,20 @@ def main(args):
     # templates for commands
     spm_train_temp = "--input={} --model_prefix={} --vocab_size={} --character_coverage=1.0 --model_type=bpe"
     spm_encode_temp = "spm_encode --model={} < {} > {}"
-    # assemble training and val data paths
+    # assemble training and val and test data paths
     #   training
     src1_train_data = f'{data_f1}.{args.src1_lang}.train'
     tgt1_train_data = f'{data_f1}.{args.tgt_lang}.train'
     src2_train_data = f'{data_f2}.{args.src2_lang}.train'
     tgt2_train_data = f'{data_f2}.{args.tgt_lang}.train'
     #   val
-    src1_val_data = f'{data_f1}.{args.src1_lang}.val'
+    src1_val_data = f'{data_f1}.{args.src1_lang}.val' # FIXME shouldn't use data_f1 since it has training len ?
     tgt1_val_data = f'{data_f1}.{args.tgt_lang}.val'
+    #   test
+    src1_test_data = f'{data_f1}.{args.src1_lang}.test'
+    tgt1_test_data = f'{data_f1}.{args.tgt_lang}.test'
     if args.use_spm:
-        #   combine target data
+        #   combine target data # FIXME just training data?
         tgtall_train_data = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
                 args.tgt_lang, args.train1_len + args.train2_len)) + f'.{args.tgt_lang}.train' 
         with open(tgt1_train_data, 'r') as f:
@@ -266,7 +292,8 @@ def main(args):
         # now encode
         encode_pairs = [(src1_spm_mod, src1_train_data), (tgt_spm_mod, tgt1_train_data),\
                 (src2_spm_mod, src2_train_data), (tgt_spm_mod, tgt2_train_data),\
-                (src1_spm_mod, src1_val_data), (tgt_spm_mod, tgt1_val_data)]
+                (src1_spm_mod, src1_val_data), (tgt_spm_mod, tgt1_val_data),\
+                (src1_spm_mod, src1_test_data), (tgt_spm_mod, tgt1_test_data)]
         for encode_pair in encode_pairs:
             encode_spm(*encode_pair)
 
@@ -388,15 +415,26 @@ embeddings_type: "GloVe"'''
     # (9) Evaluate and score ------------------------------------------------
     # model dir to find model path
     mod_dir = os.path.join(args.out_dir, 'mod', args.phon_type)
-    # testing data for src1 only
-    src_test_data = f'{data_f1}.{args.src1_lang}.test'
-    tgt_test_data = f'{data_f1}.{args.tgt_lang}.test'
+    # testing data for src1 lang only (not src2)
+    #   if we used sentencepiece, the source side should be tokenized to be translated
+    #   (it's hypotheses will be de-tokenized for evaluation)
+    #   target side should be de-tokenized for evaluation
+    if args.use_spm:
+        src_test_data = src1_test_data + '.spm'
+    else:
+        src_test_data = src1_test_data 
+    tgt_test_data = tgt1_test_data
     # output file for predictions
     out_pred_tail = '{}-preds-{}.txt'.format(args.phon_type, args.test_len)
     out_pred_file = os.path.join(args.out_dir, 'pred', out_pred_tail)
     # Now we can evaluate
+    if args.use_spm:
+        eval_decode_mod = tgt_spm_mod
+    else:
+        eval_decode_mod = None
     evaluate(mod_dir=mod_dir, src_test_data=src_test_data, out_path=out_pred_file,\
-            gpu_num=args.gpu_num, tgt_test_data=tgt_test_data, mod_num=args.model_eval_num)
+            gpu_num=args.gpu_num, tgt_test_data=tgt_test_data, mod_num=args.model_eval_num,\
+            decode_mod=eval_decode_mod)
     
     return
 
