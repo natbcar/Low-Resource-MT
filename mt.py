@@ -522,7 +522,8 @@ if __name__=='__main__':
             default=sum(bytes(b'dragn')),
             help="random seed, set to 0 for no seed")
     parser.add_argument('--use-spm', action='store_true',
-            help="Use sentencepiece encoding for tokenization or no?")
+            help="Use sentencepiece encoding for tokenization or no?\n"
+            "IMPORTANT: YOU MUST USE THIS FLAG TO USE sentencepiece ENCODING")
     parser.add_argument('--spm-vocab-size', type=int,
             help="Vocab size for sentencepiece training",
             default=13000)
