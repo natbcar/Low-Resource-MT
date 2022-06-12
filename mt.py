@@ -1,9 +1,12 @@
 import os
 import argparse
 import re
+import pdb
+
+import sentencepiece as spm
+
 from split import main as split_data
 import feat_vecs as fv
-import pdb
 
 NUMOBJ = re.compile(r'[0-9]+')
 
@@ -101,6 +104,35 @@ def create_dirs(out_dir: str, out_dir_list: list=['corpora', 'pred', 'embeds', '
     return
 
 
+def train_spm(lang: str, out_dir: str, train_temp: str, train_data_fn: str, vocab_size: int)\
+        -> str:
+    """
+    """
+    # spm model prefix
+    spm_mod_prefix = os.path.join(out_dir, 'spm', f'{lang}-spm')
+    # fill template
+    spm_train_str = train_temp.format(train_data_fn, spm_mod_prefix, vocab_size)
+    # train spm model
+    print("Training sentencepiece model for {}".format(lang), flush=True)
+    spm.SentencePieceTrainer.train(spm_train_str)
+    return spm_mod_prefix + '.model'
+
+
+def encode_spm(spm_model: str, text_file: str) -> None:
+    """
+    """
+    sp = spm.SentencePieceProcessor(model_file=spm_model)
+    with open(text_file, 'r') as f:
+        lines = f.readlines()
+    encodings = sp.encode(lines, out_type=str)
+    encoded_lines = [' '.join(encoding) + '\n' for encoding in encodings]
+    out_file = text_file + '.spm'
+    with open(out_file, 'w') as f:
+        f.writelines(encoded_lines)
+    print("Written sentencepiece encoded text to", out_file, flush=True)
+    return
+
+
 def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_test_data: str,\
         mod_num='max') -> None:
     """
@@ -183,22 +215,60 @@ def main(args):
     '''python3 split.py --src-file path-to-hatian  --tgt-file path-to-english 
     --out-file ../OpenNMT-py/fr-ht/corpora/en-ht-15k. --lang ht --train-len 
     15000 --val-len 5000 --test-len 5000''' 
-    out_f1 = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
+    data_f1 = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
             args.src1_lang, args.train1_len))
-    split_data(src_file=args.src1, tgt_file=args.tgt1, out_file=out_f1+'.', \
+    split_data(src_file=args.src1, tgt_file=args.tgt1, out_file=data_f1+'.', \
             lang=args.src1_lang, tgt_lang= args.tgt_lang, train_len=args.train1_len, \
             val_len=args.val_len, test_len=args.test_len, seed=args.seed)
     '''python3 split.py --src-file path-to-french --tgt-file path-to-english 
     --out-file ../OpenNMT-py/fr-ht/corpora/en-fr-250k. --lang fr --train-len 
     250000 --val-len 5000 --test-len 5000'''
-    out_f2 = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
+    data_f2 = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
             args.src2_lang, args.train2_len))
-    split_data(src_file=args.src2, tgt_file=args.tgt2, out_file=out_f2+'.', \
+    split_data(src_file=args.src2, tgt_file=args.tgt2, out_file=data_f2+'.', \
             lang=args.src2_lang, tgt_lang=args.tgt_lang, train_len=args.train2_len, \
             val_len=args.val_len, test_len=args.test_len)
 
     # (4) Tokenize text using sentencepiece ---------------------------------
-    # komya
+    """spm_train --input=en-lo.lo.train --model_prefix=lo-smp --vocab_size=13000 --character_coverage=1.0 --model_type=bpe
+    spm_encode --model=lo-smp.model < en-lo.lo.train > en-lo.lo.train.sp"""
+    # templates for commands
+    spm_train_temp = "--input={} --model_prefix={} --vocab_size={} --character_coverage=1.0 --model_type=bpe"
+    spm_encode_temp = "spm_encode --model={} < {} > {}"
+    # assemble training and val data paths
+    #   training
+    src1_train_data = f'{data_f1}.{args.src1_lang}.train'
+    tgt1_train_data = f'{data_f1}.{args.tgt_lang}.train'
+    src2_train_data = f'{data_f2}.{args.src2_lang}.train'
+    tgt2_train_data = f'{data_f2}.{args.tgt_lang}.train'
+    #   val
+    src1_val_data = f'{data_f1}.{args.src1_lang}.val'
+    tgt1_val_data = f'{data_f1}.{args.tgt_lang}.val'
+    if args.use_spm:
+        #   combine target data
+        tgtall_train_data = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
+                args.tgt_lang, args.train1_len + args.train2_len)) + f'.{args.tgt_lang}.train' 
+        with open(tgt1_train_data, 'r') as f:
+            tgt1_train_text = f.read()
+        with open(tgt2_train_data, 'r') as f:
+            tgt2_train_text = f.read()
+        with open(tgtall_train_data, 'w') as f:
+            f.write(tgt1_train_text + tgt2_train_text)
+        print(f"Wrote combined {args.tgt_lang} training text to {tgtall_train_data} for sentencepiece training",\
+                flush=True)
+        # train spm models for src1, src2, tgt
+        src1_spm_mod = train_spm(lang=args.src1_lang, out_dir=args.out_dir, train_temp=spm_train_temp,\
+                train_data_fn=src1_train_data, vocab_size=args.spm_vocab_size)
+        src2_spm_mod = train_spm(lang=args.src2_lang, out_dir=args.out_dir, train_temp=spm_train_temp,\
+                train_data_fn=src2_train_data, vocab_size=args.spm_vocab_size)
+        tgt_spm_mod = train_spm(lang=args.tgt_lang, out_dir=args.out_dir, train_temp=spm_train_temp,\
+                train_data_fn=tgtall_train_data, vocab_size=args.spm_vocab_size)
+        # now encode
+        encode_pairs = [(src1_spm_mod, src1_train_data), (tgt_spm_mod, tgt1_train_data),\
+                (src2_spm_mod, src2_train_data), (tgt_spm_mod, tgt2_train_data),\
+                (src1_spm_mod, src1_val_data), (tgt_spm_mod, tgt1_val_data)]
+        for encode_pair in encode_pairs:
+            encode_spm(*encode_pair)
 
     # (5) Construct config files --------------------------------------------
     print("Opening config template", flush=True)
@@ -216,28 +286,37 @@ def main(args):
     # FIXME and gpu num ?
     print("Template should have {} for the data paragraph, {} for the phon_type, "
           "'OUTDIR' for output directory, and VOCAB for vocab type", flush=True)
+    # get data file paths
+    prev_data_files = (src1_train_data, tgt1_train_data, src2_train_data, tgt2_train_data,\
+            src1_val_data, tgt1_val_data)
+    if args.use_spm:
+        src1_train_file, tgt1_train_file, src2_train_file, tgt2_train_file, src1_val_file,\
+                tgt1_val_file = tuple([pdf + '.spm' for pdf in prev_data_files])
+    else:
+        src1_train_file, tgt1_train_file, src2_train_file, tgt2_train_file, src1_val_file,\
+                tgt1_val_file = prev_data_files
     # data strings
     full_data_str = f'''data:
     corpus_1:
-        path_src: {out_f1}.{args.src1_lang}.train
-        path_tgt: {out_f1}.{args.tgt_lang}.train
+        path_src: {src1_train_file}
+        path_tgt: {tgt1_train_file}
     corpus_2:
-        path_src: {out_f2}.{args.src2_lang}.train
-        path_tgt: {out_f2}.{args.tgt_lang}.train
+        path_src: {src2_train_file}
+        path_tgt: {tgt2_train_file}
     valid:
-        path_src: {out_f1}.{args.src1_lang}.val
-        path_tgt: {out_f1}.{args.tgt_lang}.val'''
+        path_src: {src1_val_file}
+        path_tgt: {tgt1_val_file}'''
     lang1_data_str = f'''data:
     corpus_1:
-        path_src: {out_f1}.{args.src1_lang}.train
-        path_tgt: {out_f1}.{args.tgt_lang}.train
+        path_src: {src1_train_file}
+        path_tgt: {tgt1_train_file}
     valid:
-        path_src: {out_f1}.{args.src1_lang}.val
-        path_tgt: {out_f1}.{args.tgt_lang}.val'''
+        path_src: {src1_val_file}
+        path_tgt: {tgt1_val_file}'''
     lang2_data_str = f'''data:
     corpus_2:
-        path_src: {out_f2}.{args.src2_lang}.train
-        path_tgt: {out_f2}.{args.tgt_lang}.train'''
+        path_src: {src2_train_file}
+        path_tgt: {tgt2_train_file}'''
     # embedding string
     emb_info = f'''src_embeddings: {embs_path}
 embeddings_type: "GloVe"'''
@@ -310,8 +389,8 @@ embeddings_type: "GloVe"'''
     # model dir to find model path
     mod_dir = os.path.join(args.out_dir, 'mod', args.phon_type)
     # testing data for src1 only
-    src_test_data = f'{out_f1}.{args.src1_lang}.test'
-    tgt_test_data = f'{out_f1}.{args.tgt_lang}.test'
+    src_test_data = f'{data_f1}.{args.src1_lang}.test'
+    tgt_test_data = f'{data_f1}.{args.tgt_lang}.test'
     # output file for predictions
     out_pred_tail = '{}-preds-{}.txt'.format(args.phon_type, args.test_len)
     out_pred_file = os.path.join(args.out_dir, 'pred', out_pred_tail)
@@ -404,15 +483,19 @@ if __name__=='__main__':
     parser.add_argument("--seed", type=int,
             default=sum(bytes(b'dragn')),
             help="random seed, set to 0 for no seed")
+    parser.add_argument('--use-spm', action='store_true',
+            help="Use sentencepiece encoding for tokenization or no?")
+    parser.add_argument('--spm-vocab-size', type=int,
+            help="Vocab size for sentencepiece training",
+            default=13000)
 
     args = parser.parse_args()
 
     main(args)
 
     '''Example usage:
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 enht_haitian --tgt1 enht_english --src2 enfr_french --tgt2 enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 enht_haitian --tgt1 enht_english --src2 enfr_french --tgt2 enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
     '''
     '''Or on patient:
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 15000 --train2-len 250000 --val-len 5000 --test-len 5000 --config-temp config_template --emb-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
     '''

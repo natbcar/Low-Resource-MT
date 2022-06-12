@@ -1,10 +1,10 @@
 # toy_en_de.yaml
 
 ## Where the samples will be written
-save_data: OUTDIR/run/
+save_data: OUTDIR/mod/
 ## Where the vocab(s) will be written
-src_vocab: OUTDIR/run/srcVOCAB.vocab
-tgt_vocab: OUTDIR/run/tgtVOCAB.vocab
+src_vocab: OUTDIR/vocab/srcVOCAB.vocab
+tgt_vocab: OUTDIR/vocab/tgtVOCAB.vocab
 
 # # Prevent overwriting existing files in the folder
 overwrite: True
@@ -16,8 +16,8 @@ overwrite: True
 seed: 42
 
 # Vocabulary files that were just created
-src_vocab: OUTDIR/run/srcVOCAB.vocab
-tgt_vocab: OUTDIR/run/tgtVOCAB.vocab
+src_vocab: OUTDIR/vocab/srcVOCAB.vocab
+tgt_vocab: OUTDIR/vocab/tgtVOCAB.vocab
 
 EMBINFO
 
@@ -56,7 +56,7 @@ dropout: [0.1]
 attention_dropout: [0.1]
 
 # Where to save the checkpoints
-save_model: OUTDIR/run/{}/model
+save_model: OUTDIR/mod/{}/model
 save_checkpoint_steps: SAVESTEPS
 train_steps: TRAINSTEPS
 valid_steps: VALSTEPS
