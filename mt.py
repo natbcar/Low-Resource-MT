@@ -31,6 +31,15 @@ EPITRAN_LANGS = {
         }
 
 
+def execute_cmd(cmd: str):
+    """
+    """
+    try:
+        os.system(cmd)
+    except CommandException as e:
+        raise
+
+
 def extract_vocab(fn: str) -> list[str]:
     """
     Helper function: extract vocab list from vocab file
@@ -533,7 +542,7 @@ if __name__=='__main__':
     main(args)
 
     '''Example usage:
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 enht_haitian --tgt1 enht_english --src2 enfr_french --tgt2 enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 $DATADIR/fra_hat/enht_haitian --tgt1 $DATADIR/fra_hat/enht_english --src2 $DATADIR/fra_hat/enfr_french --tgt2 $DATADIR/fra_hat/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
     '''
     '''Or on patient:
     python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm

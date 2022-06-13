@@ -6,3 +6,5 @@ trtokenizer
 panphon2
 epitran
 spacy
+gsutil
+sacremoses
