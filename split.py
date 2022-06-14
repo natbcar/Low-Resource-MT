@@ -79,6 +79,9 @@ def main(src_file, tgt_file, out_file, lang, tgt_lang, train_len, val_len, test_
 
     # shuffle
     indices = np.arange(len(src))
+    if len(src) < train_len + val_len + test_len:
+        raise ValueError(f"Train len {train_len} + val len {val_len} + test len {test_len} "\
+                          "> the actual length of the bitext {len(src)}")
     np.random.shuffle(indices)
     train, val, test = indices[:train_len], indices[train_len:train_len+val_len], indices[train_len+val_len:train_len+val_len+test_len]
 

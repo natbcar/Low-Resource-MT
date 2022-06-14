@@ -9,10 +9,10 @@ wget -O $DATADIR/fra_hat/enht_english https://raw.githubusercontent.com/n8rob/co
 wget -O $DATADIR/fra_hat/enfr_french https://raw.githubusercontent.com/n8rob/corpora/master/french_haitian/enfr_fr_fromchurch.txt
 wget -O $DATADIR/fra_hat/enfr_english https://raw.githubusercontent.com/n8rob/corpora/master/french_haitian/enfr_en_fromchurch.txt
 # Download jam-fra bitext and eng-fra bitext
-wget -O $DATADIR/jam_eng/jam-fra.jamaican https://raw.githubusercontent.com/n8rob/corpora/master/english_jamaican/jm_jamfra_src.txt
-wget -O $DATADIR/jam_eng/jam-fra.french https://raw.githubusercontent.com/n8rob/corpora/master/english_jamaican/fr_jamfra_tgt.txt
-wget -O $DATADIR/jam_eng/eng-fra.english https://raw.githubusercontent.com/n8rob/corpora/master/english_jamaican/enfr_english
-wget -O $DATADIR/jam_eng/eng-fra.french https://raw.githubusercontent.com/n8rob/corpora/master/english_jamaican/enfr_french
+wget -O $DATADIR/eng_jam/jam-fra.jamaican https://raw.githubusercontent.com/n8rob/corpora/master/english_jamaican/jm_jamfra_src.txt
+wget -O $DATADIR/eng_jam/jam-fra.french https://raw.githubusercontent.com/n8rob/corpora/master/english_jamaican/fr_jamfra_tgt.txt
+wget -O $DATADIR/eng_jam/eng-fra.english https://raw.githubusercontent.com/n8rob/corpora/master/english_jamaican/enfr_english
+wget -O $DATADIR/eng_jam/eng-fra.french https://raw.githubusercontent.com/n8rob/corpora/master/english_jamaican/enfr_french
 # Download tha-eng bitext and lao-eng bitext
 wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1RDYH391r7xxKBuUA5pnuaLqyYM5BmzX5' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1RDYH391r7xxKBuUA5pnuaLqyYM5BmzX5" -O $DATADIR/tha_lao/tha-eng.thai && rm -rf /tmp/cookies.txt
 wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1hcZIS2apFsSwkB5X_x_27UtYE3f6ljZK' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1hcZIS2apFsSwkB5X_x_27UtYE3f6ljZK" -O $DATADIR/tha_lao/tha-eng.english && rm -rf /tmp/cookies.txt
