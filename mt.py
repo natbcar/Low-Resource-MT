@@ -238,9 +238,11 @@ def main(args):
     args.src1_lang = LANG_REGULARIZER[args.src1_lang.lower()]
     args.src2_lang = LANG_REGULARIZER[args.src2_lang.lower()]
     args.tgt_lang = LANG_REGULARIZER[args.tgt_lang.lower()]
+    #pdb.set_trace()
 
     # (2) Create directories ------------------------------------------------
     create_dirs(out_dir=args.out_dir)
+    #pdb.set_trace()
 
     # (3) Split data using split.py -----------------------------------------
     print("Splitting data", flush=True)
@@ -260,6 +262,7 @@ def main(args):
     split_data(src_file=args.src2, tgt_file=args.tgt2, out_file=data_f2+'.', \
             lang=args.src2_lang, tgt_lang=args.tgt_lang, train_len=args.train2_len, \
             val_len=args.val_len, test_len=args.test_len)
+    #pdb.set_trace()
 
     # (4) Tokenize text using sentencepiece ---------------------------------
     """spm_train --input=en-lo.lo.train --model_prefix=lo-smp --vocab_size=13000 --character_coverage=1.0 --model_type=bpe
@@ -305,6 +308,7 @@ def main(args):
                 (src1_spm_mod, src1_test_data), (tgt_spm_mod, tgt1_test_data)]
         for encode_pair in encode_pairs:
             encode_spm(*encode_pair)
+    #pdb.set_trace()
 
     # (5) Construct config files --------------------------------------------
     print("Opening config template", flush=True)
@@ -320,8 +324,12 @@ def main(args):
     #   and MODDIM for model dimension (should be 512)
     #   and BIGMODDIM for transformer_ff (using 4 times model dimension, or 2048) 
     # FIXME and gpu num ?
-    print("Template should have {} for the data paragraph, {} for the phon_type, "
-          "'OUTDIR' for output directory, and VOCAB for vocab type", flush=True)
+    print("Reminder: Template should have {} for the data paragraph, {} for the phon_type, "
+          "'OUTDIR' for output directory, and VOCAB for vocab type, "
+          "and 'EMBINFO' for embeddings info, and 'SAVESTEPS' for save checkpoint steps, "
+          "and TRAINSTEPS for training steps, and VALSTEPS for validation checkpoint steps, "
+          "and MODDIM for model dimension, and BIGMODDIM for transformer_ff\n"
+          "Ignore this message if using the default config_template.", flush=True)
     # get data file paths
     prev_data_files = (src1_train_data, tgt1_train_data, src2_train_data, tgt2_train_data,\
             src1_val_data, tgt1_val_data)
@@ -353,9 +361,14 @@ def main(args):
     corpus_2:
         path_src: {src2_train_file}
         path_tgt: {tgt2_train_file}'''
-    # embedding string
-    emb_info = f'''src_embeddings: {embs_path}
-embeddings_type: "GloVe"'''
+    # embedding string (must start and end with \n)
+    if phon_bool:
+        emb_info = f'''
+src_embeddings: {embs_path}
+embeddings_type: "GloVe"
+'''
+    else:
+        emb_info = ''
     # fill templates: Need config files for training and for each source lang vocab
     #   general replacements
     mostly_filled_temp = conf_temp_text.replace('OUTDIR', args.out_dir).replace(\
@@ -388,6 +401,7 @@ embeddings_type: "GloVe"'''
                 lang1_conf_fn, lang2_conf_fn), flush=True)
     else:
         print(f"Config *.yaml file written to {full_conf_fn}", flush=True)
+    #pdb.set_trace()
 
     # (6) Construct vocab ---------------------------------------------------
     vocab_cmd_temp = "onmt_build_vocab -config {} -n_sample -1"
@@ -404,6 +418,7 @@ embeddings_type: "GloVe"'''
         lang2_vocab_cmd = vocab_cmd_temp.format(lang2_conf_fn)
         print("Executing:", lang2_vocab_cmd, flush=True)
         os.system(lang2_vocab_cmd)
+    #pdb.set_trace()
 
     # (7) Create embeddings -------------------------------------------------
     vocab_fn_template = os.path.join(args.out_dir, 'vocab', 'src{}.vocab')
@@ -414,12 +429,14 @@ embeddings_type: "GloVe"'''
         create_phon_embeds(lang1_vocab_fn=lang1_vocab_fn, lang2_vocab_fn=lang2_vocab_fn,\
                 joint_vocab_fn=joint_vocab_fn, lang1=args.src1_lang, lang2=args.src2_lang,\
                 emb_fn=embs_path, phon_info=phon_info, emb_dim=args.mod_dim, seed=args.seed)
+    #pdb.set_trace()
 
     # (8) Train model -------------------------------------------------------
     print("Training MT model....", flush=True)
     train_cmd = f'onmt_train -config {full_conf_fn}'
     print('\trunning', train_cmd, flush=True)
     os.system(train_cmd)
+    #pdb.set_trace()
     
     # (9) Evaluate and score ------------------------------------------------
     # model dir to find model path
@@ -444,6 +461,7 @@ embeddings_type: "GloVe"'''
     evaluate(mod_dir=mod_dir, src_test_data=src_test_data, out_path=out_pred_file,\
             gpu_num=args.gpu_num, tgt_test_data=tgt_test_data, mod_num=args.model_eval_num,\
             decode_mod=eval_decode_mod)
+    #pdb.set_trace()
     
     return
 
