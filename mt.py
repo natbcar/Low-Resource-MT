@@ -232,6 +232,11 @@ def main(args):
     phon_bool = args.phon_type != 'base'
     # info about phon type
     phon_info = {'type':args.phon_type, 'pad':args.phon_pad, 'gram':args.phon_gram}
+    # and a phon string for naming purposes:
+    if phon_bool:
+        phon_name = f'{args.phon_type}-{args.phon_pad}-{args.phon_gram}gram'
+    else:
+        phon_name = 'base'
     # path to embeddings
     embs_path = os.path.join(args.out_dir, 'embeds', args.embeds_file)
     # Regularlize language codes
@@ -245,15 +250,24 @@ def main(args):
     #pdb.set_trace()
 
     # (3) Split data using split.py -----------------------------------------
+    # First figure out how many times to duplicate the src1_lang bitext data
+    if args.src1_duplicates:
+        num_dups = args.src1_duplicates
+    else:
+        num_dups = args.train2_len // args.train1_len
+    if num_dups > 1:
+        print(f"Duplicating {args.src1_lang} data {num_dups} times", flush=True)
+    # Now split data
     print("Splitting data", flush=True)
-    '''python3 split.py --src-file path-to-hatian  --tgt-file path-to-english 
-    --out-file ../OpenNMT-py/fr-ht/corpora/en-ht-15k. --lang ht --train-len 
-    15000 --val-len 5000 --test-len 5000''' 
+    '''python3 split.py --src-file path-to-hatian  --tgt-file path-to-english
+    --out-file ../OpenNMT-py/fr-ht/corpora/en-ht-15k. --lang ht --train-len
+    15000 --val-len 5000 --test-len 5000'''
     data_f1 = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
             args.src1_lang, args.train1_len))
     split_data(src_file=args.src1, tgt_file=args.tgt1, out_file=data_f1+'.', \
             lang=args.src1_lang, tgt_lang= args.tgt_lang, train_len=args.train1_len, \
-            val_len=args.val_len, test_len=args.test_len, seed=args.seed)
+            val_len=args.val_len, test_len=args.test_len, seed=args.seed,\
+            num_duplicates=num_dups)
     '''python3 split.py --src-file path-to-french --tgt-file path-to-english 
     --out-file ../OpenNMT-py/fr-ht/corpora/en-fr-250k. --lang fr --train-len 
     250000 --val-len 5000 --test-len 5000'''
@@ -377,18 +391,18 @@ embeddings_type: "GloVe"
             ).replace('BIGMODDIM', str(4 * args.mod_dim)).replace('MODDIM', str(args.mod_dim))
     #   specific replacements
     full_conf_text = mostly_filled_temp.replace('VOCAB', '').format(full_data_str,\
-            args.phon_type)
+            phon_name)
     lang1_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src1_lang.upper()).format(\
-            lang1_data_str, args.phon_type)
+            lang1_data_str, phon_name)
     lang2_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src2_lang.upper()).format(\
-            lang2_data_str, args.phon_type)
+            lang2_data_str, phon_name)
     # write yaml files
     # example: fr-ht/config/fr-ht-phon.yaml
     out_dir_tail = os.path.split(args.out_dir)[-1]
     full_conf_fn, lang1_conf_fn, lang2_conf_fn = \
-      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{args.phon_type}.yaml'),\
-      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{args.phon_type}-{args.src1_lang.upper()}.yaml'),\
-      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{args.phon_type}-{args.src2_lang.upper()}.yaml')
+      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{phon_name}.yaml'),\
+      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{phon_name}-{args.src1_lang.upper()}.yaml'),\
+      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{phon_name}-{args.src2_lang.upper()}.yaml')
     # Write config files
     with open(full_conf_fn, 'w') as f:
         f.write(full_conf_text)
@@ -440,7 +454,7 @@ embeddings_type: "GloVe"
     
     # (9) Evaluate and score ------------------------------------------------
     # model dir to find model path
-    mod_dir = os.path.join(args.out_dir, 'mod', args.phon_type)
+    mod_dir = os.path.join(args.out_dir, 'mod', phon_name)
     # testing data for src1 lang only (not src2)
     #   if we used sentencepiece, the source side should be tokenized to be translated
     #   (it's hypotheses will be de-tokenized for evaluation)
@@ -451,7 +465,7 @@ embeddings_type: "GloVe"
         src_test_data = src1_test_data 
     tgt_test_data = tgt1_test_data
     # output file for predictions
-    out_pred_tail = '{}-preds-{}.txt'.format(args.phon_type, args.test_len)
+    out_pred_tail = '{}-preds-{}.txt'.format(phon_name, args.test_len)
     out_pred_file = os.path.join(args.out_dir, 'pred', out_pred_tail)
     # Now we can evaluate
     if args.use_spm:
@@ -554,6 +568,9 @@ if __name__=='__main__':
     parser.add_argument('--spm-vocab-size', type=int,
             help="Vocab size for sentencepiece training",
             default=13000)
+    parser.add_argument('--src1-duplicates', type=int,
+            help="Number of times to duplicate LRL training bitext for data balance",
+            default=None)
 
     args = parser.parse_args()
 
