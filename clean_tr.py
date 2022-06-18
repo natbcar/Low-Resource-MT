@@ -2,6 +2,7 @@ import html
 import re
 import string
 import sys
+import os
 import unicodedata
 from sacremoses import MosesDetokenizer
 
@@ -147,13 +148,23 @@ def text_ratio(s):
 def has_spaced_entities(string):
     return re.search(r"& (amp|quot|lt|gt|apos|# \d+) ?;", string)
 
+input_tr = sys.argv[1]
+input_en = sys.argv[2]
+output_dir = sys.argv[3]
 
-output_en = open("tr-az/en-tr.en", "w")
-output_tr = open("tr-az/en-tr.tr", "w")
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
+
+output_en = os.path.join(output_dir, os.path.split(input_en)[-1])
+output_tr = os.path.join(output_dir, os.path.split(input_tr)[-1])
+
+output_en = open(output_en, "w")
+output_tr = open(output_tr, "w")
 
 unique_pairs = set()
+iterr= 0
 
-for text_tr, text_en in zip(open(sys.argv[1]), open(sys.argv[2])):
+for text_tr, text_en in zip(open(input_tr), open(input_en)):
     text_tr = clean_line(text_tr, "tr")
     text_en = clean_line(text_en, "en")
     if (
@@ -189,3 +200,9 @@ for text_tr, text_en in zip(open(sys.argv[1]), open(sys.argv[2])):
 
     print(text_en, file=output_en)
     print(text_tr, file=output_tr)
+
+    iterr += 1
+    if iterr % 1000 == 0:
+        print(iterr, end=' ', flush=True)
+
+print()

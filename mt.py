@@ -301,7 +301,9 @@ def main(args):
         tgtall_train_data = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
                 args.tgt_lang, args.train1_len + args.train2_len)) + f'.{args.tgt_lang}.train' 
         with open(tgt1_train_data, 'r') as f:
-            tgt1_train_text = f.read()
+            # This data might be duplicated
+            tgt1_train_lines = f.readlines()[:args.train1_len]
+            tgt1_train_text = ''.join(tgt_train_lines)
         with open(tgt2_train_data, 'r') as f:
             tgt2_train_text = f.read()
         with open(tgtall_train_data, 'w') as f:

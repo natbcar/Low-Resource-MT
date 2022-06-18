@@ -149,13 +149,22 @@ def text_ratio(s):
 def has_spaced_entities(string):
     return re.search(r"& (amp|quot|lt|gt|apos|# \d+) ?;", string)
 
+input_az = sys.argv[1]
+input_en = sys.argv[2]
+output_dir = sys.argv[3]
 
-output_en = open("tr-az/en-az.en", "w")
-output_az = open("tr-az/en-az.az", "w")
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
+
+output_en = os.path.join(output_dir, os.path.split(input_en)[-1])
+output_az = os.path.join(output_dir, os.path.split(input_az)[-1])
+
+output_en = open(output_en, "w")
+output_az = open(output_az, "w")
 
 unique_pairs = set()
 
-for text_az, text_en in zip(open(sys.argv[1]), open(sys.argv[2])):
+for text_az, text_en in zip(open(input_az), open(input_en)):
     text_az = clean_line(text_az, "az")
     text_en = clean_line(text_en, "en")
     if (
@@ -191,3 +200,9 @@ for text_az, text_en in zip(open(sys.argv[1]), open(sys.argv[2])):
 
     print(text_en, file=output_en)
     print(text_az, file=output_az)
+
+    iterr += 1
+    if iterr % 1000 == 0:
+        print(iterr, end=' ', flush=True)
+
+print()
