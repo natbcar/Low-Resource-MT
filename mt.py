@@ -177,7 +177,11 @@ def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_
     """
     # Find model path
     saved_models = os.listdir(mod_dir)
-    num2saved_mod = {int(NUMOBJ.search(saved_mod)[0]):saved_mod for saved_mod in saved_models}
+    try:
+        num2saved_mod = {int(NUMOBJ.search(saved_mod)[0]):saved_mod for saved_mod in saved_models}
+    except:
+        print("Issue with list of saved models {}".format(saved_models))
+        raise
     mod_nums = list(num2saved_mod.keys())
     if mod_num == 'max':
         chosen_mod_num = max(mod_nums)
@@ -228,6 +232,8 @@ def main(args):
     """
     
     # (1) Preliminary steps ------------------------------------------------
+    # Print out args for documenting purposes
+    print("Argument namespace used:", args, flush=True)
     # Useful bool for phon embeddings or no?
     phon_bool = args.phon_type != 'base'
     # info about phon type
