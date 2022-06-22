@@ -31,6 +31,15 @@ EPITRAN_LANGS = {
         }
 
 
+def execute_cmd(cmd: str):
+    """
+    """
+    try:
+        os.system(cmd)
+    except CommandException as e:
+        raise
+
+
 def extract_vocab(fn: str) -> list[str]:
     """
     Helper function: extract vocab list from vocab file
@@ -168,7 +177,11 @@ def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_
     """
     # Find model path
     saved_models = os.listdir(mod_dir)
-    num2saved_mod = {int(NUMOBJ.search(saved_mod)[0]):saved_mod for saved_mod in saved_models}
+    try:
+        num2saved_mod = {int(NUMOBJ.search(saved_mod)[0]):saved_mod for saved_mod in saved_models}
+    except:
+        print("Issue with list of saved models {}".format(saved_models))
+        raise
     mod_nums = list(num2saved_mod.keys())
     if mod_num == 'max':
         chosen_mod_num = max(mod_nums)
@@ -219,30 +232,48 @@ def main(args):
     """
     
     # (1) Preliminary steps ------------------------------------------------
+    # Print out args for documenting purposes
+    print("Argument namespace used:", args, flush=True)
     # Useful bool for phon embeddings or no?
     phon_bool = args.phon_type != 'base'
     # info about phon type
     phon_info = {'type':args.phon_type, 'pad':args.phon_pad, 'gram':args.phon_gram}
+    # and a phon string for naming purposes:
+    if phon_bool:
+        phon_name = f'{args.phon_type}-{args.phon_pad}-{args.phon_gram}gram'
+    else:
+        phon_name = 'base'
     # path to embeddings
     embs_path = os.path.join(args.out_dir, 'embeds', args.embeds_file)
     # Regularlize language codes
     args.src1_lang = LANG_REGULARIZER[args.src1_lang.lower()]
     args.src2_lang = LANG_REGULARIZER[args.src2_lang.lower()]
     args.tgt_lang = LANG_REGULARIZER[args.tgt_lang.lower()]
+    #pdb.set_trace()
 
     # (2) Create directories ------------------------------------------------
     create_dirs(out_dir=args.out_dir)
+    #pdb.set_trace()
 
     # (3) Split data using split.py -----------------------------------------
+    # First figure out how many times to duplicate the src1_lang bitext data
+    if args.src1_duplicates:
+        num_dups = args.src1_duplicates
+    else:
+        num_dups = args.train2_len // args.train1_len
+    if num_dups > 1:
+        print(f"Duplicating {args.src1_lang} data {num_dups} times", flush=True)
+    # Now split data
     print("Splitting data", flush=True)
-    '''python3 split.py --src-file path-to-hatian  --tgt-file path-to-english 
-    --out-file ../OpenNMT-py/fr-ht/corpora/en-ht-15k. --lang ht --train-len 
-    15000 --val-len 5000 --test-len 5000''' 
+    '''python3 split.py --src-file path-to-hatian  --tgt-file path-to-english
+    --out-file ../OpenNMT-py/fr-ht/corpora/en-ht-15k. --lang ht --train-len
+    15000 --val-len 5000 --test-len 5000'''
     data_f1 = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
             args.src1_lang, args.train1_len))
     split_data(src_file=args.src1, tgt_file=args.tgt1, out_file=data_f1+'.', \
             lang=args.src1_lang, tgt_lang= args.tgt_lang, train_len=args.train1_len, \
-            val_len=args.val_len, test_len=args.test_len, seed=args.seed)
+            val_len=args.val_len, test_len=args.test_len, seed=args.seed,\
+            num_duplicates=num_dups)
     '''python3 split.py --src-file path-to-french --tgt-file path-to-english 
     --out-file ../OpenNMT-py/fr-ht/corpora/en-fr-250k. --lang fr --train-len 
     250000 --val-len 5000 --test-len 5000'''
@@ -251,6 +282,7 @@ def main(args):
     split_data(src_file=args.src2, tgt_file=args.tgt2, out_file=data_f2+'.', \
             lang=args.src2_lang, tgt_lang=args.tgt_lang, train_len=args.train2_len, \
             val_len=args.val_len, test_len=args.test_len)
+    #pdb.set_trace()
 
     # (4) Tokenize text using sentencepiece ---------------------------------
     """spm_train --input=en-lo.lo.train --model_prefix=lo-smp --vocab_size=13000 --character_coverage=1.0 --model_type=bpe
@@ -275,7 +307,9 @@ def main(args):
         tgtall_train_data = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
                 args.tgt_lang, args.train1_len + args.train2_len)) + f'.{args.tgt_lang}.train' 
         with open(tgt1_train_data, 'r') as f:
-            tgt1_train_text = f.read()
+            # This data might be duplicated
+            tgt1_train_lines = f.readlines()[:args.train1_len]
+            tgt1_train_text = ''.join(tgt_train_lines)
         with open(tgt2_train_data, 'r') as f:
             tgt2_train_text = f.read()
         with open(tgtall_train_data, 'w') as f:
@@ -296,6 +330,7 @@ def main(args):
                 (src1_spm_mod, src1_test_data), (tgt_spm_mod, tgt1_test_data)]
         for encode_pair in encode_pairs:
             encode_spm(*encode_pair)
+    #pdb.set_trace()
 
     # (5) Construct config files --------------------------------------------
     print("Opening config template", flush=True)
@@ -311,8 +346,12 @@ def main(args):
     #   and MODDIM for model dimension (should be 512)
     #   and BIGMODDIM for transformer_ff (using 4 times model dimension, or 2048) 
     # FIXME and gpu num ?
-    print("Template should have {} for the data paragraph, {} for the phon_type, "
-          "'OUTDIR' for output directory, and VOCAB for vocab type", flush=True)
+    print("Reminder: Template should have {} for the data paragraph, {} for the phon_type, "
+          "'OUTDIR' for output directory, and VOCAB for vocab type, "
+          "and 'EMBINFO' for embeddings info, and 'SAVESTEPS' for save checkpoint steps, "
+          "and TRAINSTEPS for training steps, and VALSTEPS for validation checkpoint steps, "
+          "and MODDIM for model dimension, and BIGMODDIM for transformer_ff\n"
+          "Ignore this message if using the default config_template.", flush=True)
     # get data file paths
     prev_data_files = (src1_train_data, tgt1_train_data, src2_train_data, tgt2_train_data,\
             src1_val_data, tgt1_val_data)
@@ -344,9 +383,14 @@ def main(args):
     corpus_2:
         path_src: {src2_train_file}
         path_tgt: {tgt2_train_file}'''
-    # embedding string
-    emb_info = f'''src_embeddings: {embs_path}
-embeddings_type: "GloVe"'''
+    # embedding string (must start and end with \n)
+    if phon_bool:
+        emb_info = f'''
+src_embeddings: {embs_path}
+embeddings_type: "GloVe"
+'''
+    else:
+        emb_info = ''
     # fill templates: Need config files for training and for each source lang vocab
     #   general replacements
     mostly_filled_temp = conf_temp_text.replace('OUTDIR', args.out_dir).replace(\
@@ -355,18 +399,18 @@ embeddings_type: "GloVe"'''
             ).replace('BIGMODDIM', str(4 * args.mod_dim)).replace('MODDIM', str(args.mod_dim))
     #   specific replacements
     full_conf_text = mostly_filled_temp.replace('VOCAB', '').format(full_data_str,\
-            args.phon_type)
+            phon_name)
     lang1_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src1_lang.upper()).format(\
-            lang1_data_str, args.phon_type)
+            lang1_data_str, phon_name)
     lang2_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src2_lang.upper()).format(\
-            lang2_data_str, args.phon_type)
+            lang2_data_str, phon_name)
     # write yaml files
     # example: fr-ht/config/fr-ht-phon.yaml
     out_dir_tail = os.path.split(args.out_dir)[-1]
     full_conf_fn, lang1_conf_fn, lang2_conf_fn = \
-      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{args.phon_type}.yaml'),\
-      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{args.phon_type}-{args.src1_lang.upper()}.yaml'),\
-      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{args.phon_type}-{args.src2_lang.upper()}.yaml')
+      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{phon_name}.yaml'),\
+      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{phon_name}-{args.src1_lang.upper()}.yaml'),\
+      os.path.join(args.out_dir, 'config', f'{out_dir_tail}-{phon_name}-{args.src2_lang.upper()}.yaml')
     # Write config files
     with open(full_conf_fn, 'w') as f:
         f.write(full_conf_text)
@@ -379,6 +423,7 @@ embeddings_type: "GloVe"'''
                 lang1_conf_fn, lang2_conf_fn), flush=True)
     else:
         print(f"Config *.yaml file written to {full_conf_fn}", flush=True)
+    #pdb.set_trace()
 
     # (6) Construct vocab ---------------------------------------------------
     vocab_cmd_temp = "onmt_build_vocab -config {} -n_sample -1"
@@ -395,6 +440,7 @@ embeddings_type: "GloVe"'''
         lang2_vocab_cmd = vocab_cmd_temp.format(lang2_conf_fn)
         print("Executing:", lang2_vocab_cmd, flush=True)
         os.system(lang2_vocab_cmd)
+    #pdb.set_trace()
 
     # (7) Create embeddings -------------------------------------------------
     vocab_fn_template = os.path.join(args.out_dir, 'vocab', 'src{}.vocab')
@@ -405,16 +451,18 @@ embeddings_type: "GloVe"'''
         create_phon_embeds(lang1_vocab_fn=lang1_vocab_fn, lang2_vocab_fn=lang2_vocab_fn,\
                 joint_vocab_fn=joint_vocab_fn, lang1=args.src1_lang, lang2=args.src2_lang,\
                 emb_fn=embs_path, phon_info=phon_info, emb_dim=args.mod_dim, seed=args.seed)
+    #pdb.set_trace()
 
     # (8) Train model -------------------------------------------------------
     print("Training MT model....", flush=True)
     train_cmd = f'onmt_train -config {full_conf_fn}'
     print('\trunning', train_cmd, flush=True)
     os.system(train_cmd)
+    #pdb.set_trace()
     
     # (9) Evaluate and score ------------------------------------------------
     # model dir to find model path
-    mod_dir = os.path.join(args.out_dir, 'mod', args.phon_type)
+    mod_dir = os.path.join(args.out_dir, 'mod', phon_name)
     # testing data for src1 lang only (not src2)
     #   if we used sentencepiece, the source side should be tokenized to be translated
     #   (it's hypotheses will be de-tokenized for evaluation)
@@ -425,7 +473,7 @@ embeddings_type: "GloVe"'''
         src_test_data = src1_test_data 
     tgt_test_data = tgt1_test_data
     # output file for predictions
-    out_pred_tail = '{}-preds-{}.txt'.format(args.phon_type, args.test_len)
+    out_pred_tail = '{}-preds-{}.txt'.format(phon_name, args.test_len)
     out_pred_file = os.path.join(args.out_dir, 'pred', out_pred_tail)
     # Now we can evaluate
     if args.use_spm:
@@ -435,6 +483,7 @@ embeddings_type: "GloVe"'''
     evaluate(mod_dir=mod_dir, src_test_data=src_test_data, out_path=out_pred_file,\
             gpu_num=args.gpu_num, tgt_test_data=tgt_test_data, mod_num=args.model_eval_num,\
             decode_mod=eval_decode_mod)
+    #pdb.set_trace()
     
     return
 
@@ -527,13 +576,16 @@ if __name__=='__main__':
     parser.add_argument('--spm-vocab-size', type=int,
             help="Vocab size for sentencepiece training",
             default=13000)
+    parser.add_argument('--src1-duplicates', type=int,
+            help="Number of times to duplicate LRL training bitext for data balance",
+            default=None)
 
     args = parser.parse_args()
 
     main(args)
 
     '''Example usage:
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 enht_haitian --tgt1 enht_english --src2 enfr_french --tgt2 enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 $DATADIR/fra_hat/enht_haitian --tgt1 $DATADIR/fra_hat/enht_english --src2 $DATADIR/fra_hat/enfr_french --tgt2 $DATADIR/fra_hat/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
     '''
     '''Or on patient:
     python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm

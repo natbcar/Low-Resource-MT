@@ -68,7 +68,8 @@ def write(lines, outfile):
         f.writelines(lines)
 
 
-def main(src_file, tgt_file, out_file, lang, tgt_lang, train_len, val_len, test_len, seed=0):
+def main(src_file, tgt_file, out_file, lang, tgt_lang, train_len, val_len, test_len, \
+        num_duplicates=1, seed=0):
     with open(src_file, "r") as f:
         src = f.readlines()
     with open(tgt_file, "r") as f:
@@ -79,6 +80,9 @@ def main(src_file, tgt_file, out_file, lang, tgt_lang, train_len, val_len, test_
 
     # shuffle
     indices = np.arange(len(src))
+    if len(src) < train_len + val_len + test_len:
+        raise ValueError(f"Train len {train_len} + val len {val_len} + test len {test_len} "\
+                          "> the actual length of the bitext {len(src)}")
     np.random.shuffle(indices)
     train, val, test = indices[:train_len], indices[train_len:train_len+val_len], indices[train_len+val_len:train_len+val_len+test_len]
 
@@ -104,6 +108,10 @@ def main(src_file, tgt_file, out_file, lang, tgt_lang, train_len, val_len, test_
     src_val_tok, tgt_val_tok = clean(src_val, tgt_val, lang)
     src_test_tok, tgt_test_tok = clean(src_test, tgt_test, lang)
 
+    print(len(src_train_tok), len(tgt_train_tok))
+
+    src_train_tok = src_train_tok * num_duplicates
+    tgt_train_tok = tgt_train_tok * num_duplicates
     print(len(src_train_tok), len(tgt_train_tok))
 
     # write to outfile
@@ -148,7 +156,10 @@ if __name__ == "__main__":
                         type=int)
     parser.add_argument("--test-len",
                         type=int)
+    parser.add_argument("--num-duplicates",
+                        type=int,
+                        default=1)
     args = parser.parse_args()
 
     main(args.src_file, args.tgt_file, args.out_file, args.lang,\
-            args.train_len, args.val_len, args.test_len)   
+            args.train_len, args.val_len, args.test_len, args.num_duplicates)   
