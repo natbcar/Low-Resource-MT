@@ -42,6 +42,7 @@ def build_embeddings(opt, text_field, for_encoder=True):
         word_vec_size=emb_dim,
         position_encoding=opt.position_encoding,
         feat_merge=opt.feat_merge,
+        pretrain_vec_len=opt.pretrain_vec_len,
         feat_vec_exponent=opt.feat_vec_exponent,
         feat_vec_size=opt.feat_vec_size,
         dropout=opt.dropout[0] if type(opt.dropout) is list else opt.dropout,

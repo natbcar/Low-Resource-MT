@@ -195,7 +195,8 @@ def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_
     mod_path = os.path.join(mod_dir, mod_path_tail)
     # Now translate via onmt command and evaluate (with sacrebleu)
     print("Evaluating model saved at", mod_path, flush=True)
-    eval_cmd_temp = 'onmt_translate -model {} -src {} -output {} -gpu {}'
+    eval_cmd_temp = 'python3 translate.py -model {} -src {} -output {} -gpu {}'
+    eval_cmd_temp = "/usr0/home/nrrobins/miniconda3/envs/onmt/bin/" + eval_cmd_temp
     bleu_cmd_temp = 'sacrebleu {} -i {} -m bleu'
     chrf_cmd_temp = 'sacrebleu {} -i {} -m chrf --chrf-word-order 2'
     # first predict translations
@@ -227,7 +228,7 @@ def main(args):
     args:
         out_dir, phon_type, src1, tgt1, src2, tgt2, src1_lang, src2_lang, 
         tgt_lang, train1_len, train2_len, val_len, test_len, config_temp,
-        embeds_file, emb_dim, gpu_num 
+        embeds_file, emb_dim, gpu_num
         (See 'help' descriptions below)
     """
     
@@ -243,8 +244,14 @@ def main(args):
         phon_name = f'{args.phon_type}-{args.phon_pad}-{args.phon_gram}gram'
     else:
         phon_name = 'base'
+    # Check for setting pretrained vector length for linear transform
+    if args.pretrain_vec_len and args.phon_pad != "linmap": # FIXME: calculate pretrain_vec_len
+        print("WARNING: you set --pretrain-vec-len, but --phon-pad is not 'linmap'. "
+                "Value of --pretrain-vec-len is irrelevant.", flush=True)
     # path to embeddings
-    embs_path = os.path.join(args.out_dir, 'embeds', args.embeds_file)
+    embeds_file_suffix = "-{}.txt".format(phon_name)
+    embeds_file_out = args.embeds_file + embeds_file_suffix
+    embs_path = os.path.join(args.out_dir, 'embeds', embeds_file_out)
     # Regularlize language codes
     args.src1_lang = LANG_REGULARIZER[args.src1_lang.lower()]
     args.src2_lang = LANG_REGULARIZER[args.src2_lang.lower()]
@@ -309,7 +316,7 @@ def main(args):
         with open(tgt1_train_data, 'r') as f:
             # This data might be duplicated
             tgt1_train_lines = f.readlines()[:args.train1_len]
-            tgt1_train_text = ''.join(tgt_train_lines)
+            tgt1_train_text = ''.join(tgt1_train_lines)
         with open(tgt2_train_data, 'r') as f:
             tgt2_train_text = f.read()
         with open(tgtall_train_data, 'w') as f:
@@ -455,7 +462,10 @@ embeddings_type: "GloVe"
 
     # (8) Train model -------------------------------------------------------
     print("Training MT model....", flush=True)
-    train_cmd = f'onmt_train -config {full_conf_fn}'
+    train_cmd = f'python3 train.py -config {full_conf_fn}'
+    if args.phon_pad == 'linmap':
+        train_cmd = train_cmd + " --pretrain_vec_len 72" # FIXME: hardcoded number just to be fast
+    train_cmd = "/usr0/home/nrrobins/miniconda3/envs/onmt/bin/" + train_cmd #FIXME
     print('\trunning', train_cmd, flush=True)
     os.system(train_cmd)
     #pdb.set_trace()
@@ -505,8 +515,12 @@ if __name__=='__main__':
             required=True)
     parser.add_argument('--phon-pad', type=str,
             help='How to pad phonological embeddings?',
-            choices=['cat', 'rand', 'zero'],
+            choices=['cat', 'rand', 'zero', 'linmap'],
             default='random')
+    parser.add_argument('--pretrain-vec-len', type=int,
+            help="input dim for linear transform if transforming embeddings into model dim "
+            "(i.e. this is the pretrained vector length and not equal to the model dim)",
+            default=0)
     parser.add_argument('--phon-gram', type=int,
             help='Organize phon embeddings via ngrams or unigrams? '
             'For unigrams, set to 1; for ngrams, set to n',
