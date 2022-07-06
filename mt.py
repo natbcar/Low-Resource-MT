@@ -155,7 +155,7 @@ def decode_spm(spm_model: str, text_file: str) -> None:
     with open(out_file, 'w') as f:
         f.writelines(decoded_lines)
     print("Written decoded output to", out_file, flush=True)
-    return
+    return out_file
 
 
 def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_test_data: str,\
@@ -206,8 +206,7 @@ def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_
     print("\tsaved hypotheses to", out_path, flush=True)
     if decode_mod:
         # second, before scoring we may have to decode
-        decode_spm(spm_model=decode_mod, text_file=out_path)
-        hyp_file = out_path + '.decode' # FIXME make this the output of decode_spm
+        hyp_file = decode_spm(spm_model=decode_mod, text_file=out_path)
     else:
         hyp_file = out_path
     # then score - BLEU
@@ -310,7 +309,7 @@ def main(args):
     src1_test_data = f'{data_f1}.{args.src1_lang}.test'
     tgt1_test_data = f'{data_f1}.{args.tgt_lang}.test'
     if args.use_spm:
-        #   combine target data # FIXME just training data?
+        #   combine target data
         tgtall_train_data = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
                 args.tgt_lang, args.train1_len + args.train2_len)) + f'.{args.tgt_lang}.train' 
         with open(tgt1_train_data, 'r') as f:
@@ -463,8 +462,8 @@ embeddings_type: "GloVe"
     # (8) Train model -------------------------------------------------------
     print("Training MT model....", flush=True)
     train_cmd = f'python3 train.py -config {full_conf_fn}'
-    if args.phon_pad == 'linmap':
-        train_cmd = train_cmd + " --pretrain_vec_len 72" # FIXME: hardcoded number just to be fast
+    if args.phon_pad == 'linmap': # FIXME this the right condition?
+        train_cmd = train_cmd + f" --pretrain_vec_len {args.pretrain_vec_len}"
     train_cmd = "/usr0/home/nrrobins/miniconda3/envs/onmt/bin/" + train_cmd #FIXME
     print('\trunning', train_cmd, flush=True)
     os.system(train_cmd)
@@ -537,10 +536,10 @@ if __name__=='__main__':
     parser.add_argument('--tgt2', type=str,
             help='Target language (TGT) file aligned with src2',
             required=True)
-    parser.add_argument('--src1_lang', type=str,
+    parser.add_argument('--src1-lang', type=str,
             help='First source language (LRL, testing language)',
             required=True)
-    parser.add_argument('--src2_lang', type=str,
+    parser.add_argument('--src2-lang', type=str,
             help='Second source language (HRL, transfer language)',
             required=True)
     parser.add_argument('--tgt-lang', type=str,
@@ -599,8 +598,8 @@ if __name__=='__main__':
     main(args)
 
     '''Example usage:
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 $DATADIR/fra_hat/enht_haitian --tgt1 $DATADIR/fra_hat/enht_english --src2 $DATADIR/fra_hat/enfr_french --tgt2 $DATADIR/fra_hat/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 $DATADIR/fra_hat/enht_haitian --tgt1 $DATADIR/fra_hat/enht_english --src2 $DATADIR/fra_hat/enfr_french --tgt2 $DATADIR/fra_hat/enfr_english --src1-lang ht --src2-lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
     '''
     '''Or on patient:
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1-lang ht --src2-lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
     '''

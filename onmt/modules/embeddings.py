@@ -234,7 +234,7 @@ class Embeddings(nn.Module):
         """Embedding look-up table."""
         return self.make_embedding[0]
 
-    def load_pretrained_vectors(self, emb_file):
+    def load_pretrained_vectors(self, emb_file, pretrain_vec_len=0):
         """Load in pretrained embeddings.
 
         Args:
@@ -252,6 +252,9 @@ class Embeddings(nn.Module):
             #else:
             #    self.word_lut.weight.data.copy_(pretrained)
             self.word_lut.weight.data = pretrained
+        elif pretrain_vec_len:
+            self.word_lut.weight.data = \
+                    self.word_lut.weight.data[:, :pretrain_vec_len] # FIXME not necessary?
 
     def forward(self, source, step=None):
         """Computes the embeddings for words and features.

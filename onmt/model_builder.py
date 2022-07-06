@@ -19,6 +19,7 @@ from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
 from onmt.constants import ModelTask
 
+import pdb
 
 def build_embeddings(opt, text_field, for_encoder=True):
     """
@@ -277,7 +278,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
 
         if hasattr(model, "encoder") and hasattr(model.encoder, "embeddings"):
             model.encoder.embeddings.load_pretrained_vectors(
-                model_opt.pre_word_vecs_enc)
+                model_opt.pre_word_vecs_enc, model_opt.pretrain_vec_len)
         if hasattr(model.decoder, 'embeddings'):
             model.decoder.embeddings.load_pretrained_vectors(
                 model_opt.pre_word_vecs_dec)
