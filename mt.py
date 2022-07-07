@@ -91,26 +91,34 @@ def create_phon_embeds(lang1_vocab_fn: str, lang2_vocab_fn: str, joint_vocab_fn:
 
 
 def create_dirs(out_dir: str, out_dir_list: list=['corpora', 'pred', 'embeds', 'mod', 'vocab',\
-        'config', 'spm']) -> None:
+        'config', 'spm']) -> str:
     """
     Helper function to create directories using os.mkdir
 
     Params:
         out_dir (str): main dir to be made
         out_dir_list (list[str]): subdir's to be made
+    Returns:
+        out_dir (str): main dir, possibly modified
     """
     print("Creating all out directories", flush=True)
+    # Check if out_dir exists and fix that
+    while os.path.exists(out_dir): # FIXME do fancy incremental thing
+        out_dir = out_dir + '(1)'
     # main dir
     if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
+        os.makedirs(out_dir)
         print(f"\tcreated {out_dir}", flush=True)
+    else:
+        print("WARNING: output dir already exists and may have files that will be overwritten"\
+                ",", out_dir, flush=True)
     # subdir's
     for dir_tail in out_dir_list:
         dir_ = os.path.join(out_dir, dir_tail)
         if not os.path.exists(dir_):
             os.mkdir(dir_)
     print(f"\tdirectories now exist for {out_dir_list}", flush=True)
-    return
+    return out_dir
 
 
 def train_spm(lang: str, out_dir: str, train_temp: str, train_data_fn: str, vocab_size: int)\
@@ -177,6 +185,7 @@ def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_
     """
     # Find model path
     saved_models = os.listdir(mod_dir)
+    saved_models = [sm for sm in saved_models if sm[0] != '.']
     try:
         num2saved_mod = {int(NUMOBJ.search(saved_mod)[0]):saved_mod for saved_mod in saved_models}
     except:
@@ -196,7 +205,7 @@ def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_
     # Now translate via onmt command and evaluate (with sacrebleu)
     print("Evaluating model saved at", mod_path, flush=True)
     eval_cmd_temp = 'python3 translate.py -model {} -src {} -output {} -gpu {}'
-    eval_cmd_temp = "/usr0/home/nrrobins/miniconda3/envs/onmt/bin/" + eval_cmd_temp
+    # eval_cmd_temp = "/usr0/home/nrrobins/miniconda3/envs/onmt/bin/" + eval_cmd_temp
     bleu_cmd_temp = 'sacrebleu {} -i {} -m bleu'
     chrf_cmd_temp = 'sacrebleu {} -i {} -m chrf --chrf-word-order 2'
     # first predict translations
@@ -242,7 +251,15 @@ def main(args):
     if phon_bool:
         phon_name = f'{args.phon_type}-{args.phon_pad}-{args.phon_gram}gram'
     else:
-        phon_name = 'base'
+        assert args.phon_pad in ['rand', 'linmap'], "With phon_type=='base', only padding "\
+                "options are 'rand' and 'linmap', not {}".format(args.phon_pad)
+        if args.phon_gram > 1:
+            print("WARNING: entered phon_gram > 1 with phon_type=='base' (useless assignment)",\
+                    flush=True)
+        phon_name = f'base-{args.phon_pad}'
+    # Tack phon_name dir onto the end of the output dir - don't mix files with other phon styles
+    args.out_dir = os.path.join(args.out_dir, phon_name)
+    print("Phon. information name for file paths:", phon_name, flush=True)
     # Check for setting pretrained vector length for linear transform
     if args.pretrain_vec_len and args.phon_pad != "linmap": # FIXME: calculate pretrain_vec_len
         print("WARNING: you set --pretrain-vec-len, but --phon-pad is not 'linmap'. "
@@ -258,7 +275,7 @@ def main(args):
     #pdb.set_trace()
 
     # (2) Create directories ------------------------------------------------
-    create_dirs(out_dir=args.out_dir)
+    args.out_dir = create_dirs(out_dir=args.out_dir)
     #pdb.set_trace()
 
     # (3) Split data using split.py -----------------------------------------
@@ -404,12 +421,11 @@ embeddings_type: "GloVe"
             'TRAINSTEPS', str(args.train_steps)).replace('VALSTEPS', str(args.val_steps)\
             ).replace('BIGMODDIM', str(4 * args.mod_dim)).replace('MODDIM', str(args.mod_dim))
     #   specific replacements
-    full_conf_text = mostly_filled_temp.replace('VOCAB', '').format(full_data_str,\
-            phon_name)
+    full_conf_text = mostly_filled_temp.replace('VOCAB', '').format(full_data_str)
     lang1_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src1_lang.upper()).format(\
-            lang1_data_str, phon_name)
+            lang1_data_str)
     lang2_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src2_lang.upper()).format(\
-            lang2_data_str, phon_name)
+            lang2_data_str)
     # write yaml files
     # example: fr-ht/config/fr-ht-phon.yaml
     out_dir_tail = os.path.split(args.out_dir)[-1]
@@ -464,14 +480,14 @@ embeddings_type: "GloVe"
     train_cmd = f'python3 train.py -config {full_conf_fn}'
     if args.phon_pad == 'linmap': # FIXME this the right condition?
         train_cmd = train_cmd + f" --pretrain_vec_len {args.pretrain_vec_len}"
-    train_cmd = "/usr0/home/nrrobins/miniconda3/envs/onmt/bin/" + train_cmd #FIXME
+    # train_cmd = "/usr0/home/nrrobins/miniconda3/envs/onmt/bin/" + train_cmd #FIXME
     print('\trunning', train_cmd, flush=True)
     os.system(train_cmd)
     #pdb.set_trace()
     
     # (9) Evaluate and score ------------------------------------------------
     # model dir to find model path
-    mod_dir = os.path.join(args.out_dir, 'mod', phon_name)
+    mod_dir = os.path.join(args.out_dir, 'mod')
     # testing data for src1 lang only (not src2)
     #   if we used sentencepiece, the source side should be tokenized to be translated
     #   (it's hypotheses will be de-tokenized for evaluation)

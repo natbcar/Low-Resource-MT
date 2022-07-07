@@ -54,7 +54,7 @@ dropout: [0.1]
 attention_dropout: [0.1]
 
 # Where to save the checkpoints
-save_model: OUTDIR/mod/{}/model
+save_model: OUTDIR/mod/model
 save_checkpoint_steps: SAVESTEPS
 train_steps: TRAINSTEPS
 valid_steps: VALSTEPS
