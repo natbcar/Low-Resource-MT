@@ -91,26 +91,34 @@ def create_phon_embeds(lang1_vocab_fn: str, lang2_vocab_fn: str, joint_vocab_fn:
 
 
 def create_dirs(out_dir: str, out_dir_list: list=['corpora', 'pred', 'embeds', 'mod', 'vocab',\
-        'config', 'spm']) -> None:
+        'config', 'spm']) -> str:
     """
     Helper function to create directories using os.mkdir
 
     Params:
         out_dir (str): main dir to be made
         out_dir_list (list[str]): subdir's to be made
+    Returns:
+        out_dir (str): main dir, possibly modified
     """
     print("Creating all out directories", flush=True)
+    # Check if out_dir exists and fix that
+    while os.path.exists(out_dir): # FIXME do fancy incremental thing
+        out_dir = out_dir + '_1'
     # main dir
     if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
+        os.makedirs(out_dir)
         print(f"\tcreated {out_dir}", flush=True)
+    else:
+        print("WARNING: output dir already exists and may have files that will be overwritten"\
+                ",", out_dir, flush=True)
     # subdir's
     for dir_tail in out_dir_list:
         dir_ = os.path.join(out_dir, dir_tail)
         if not os.path.exists(dir_):
             os.mkdir(dir_)
     print(f"\tdirectories now exist for {out_dir_list}", flush=True)
-    return
+    return out_dir
 
 
 def train_spm(lang: str, out_dir: str, train_temp: str, train_data_fn: str, vocab_size: int)\
@@ -155,7 +163,7 @@ def decode_spm(spm_model: str, text_file: str) -> None:
     with open(out_file, 'w') as f:
         f.writelines(decoded_lines)
     print("Written decoded output to", out_file, flush=True)
-    return
+    return out_file
 
 
 def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_test_data: str,\
@@ -177,6 +185,7 @@ def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_
     """
     # Find model path
     saved_models = os.listdir(mod_dir)
+    saved_models = [sm for sm in saved_models if sm[0] != '.']
     try:
         num2saved_mod = {int(NUMOBJ.search(saved_mod)[0]):saved_mod for saved_mod in saved_models}
     except:
@@ -195,7 +204,8 @@ def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_
     mod_path = os.path.join(mod_dir, mod_path_tail)
     # Now translate via onmt command and evaluate (with sacrebleu)
     print("Evaluating model saved at", mod_path, flush=True)
-    eval_cmd_temp = 'onmt_translate -model {} -src {} -output {} -gpu {}'
+    eval_cmd_temp = 'python3 translate.py -model {} -src {} -output {} -gpu {}'
+    # eval_cmd_temp = "/usr0/home/nrrobins/miniconda3/envs/onmt/bin/" + eval_cmd_temp
     bleu_cmd_temp = 'sacrebleu {} -i {} -m bleu'
     chrf_cmd_temp = 'sacrebleu {} -i {} -m chrf --chrf-word-order 2'
     # first predict translations
@@ -205,8 +215,7 @@ def evaluate(mod_dir: str, src_test_data: str, out_path: str, gpu_num: int, tgt_
     print("\tsaved hypotheses to", out_path, flush=True)
     if decode_mod:
         # second, before scoring we may have to decode
-        decode_spm(spm_model=decode_mod, text_file=out_path)
-        hyp_file = out_path + '.decode' # FIXME make this the output of decode_spm
+        hyp_file = decode_spm(spm_model=decode_mod, text_file=out_path)
     else:
         hyp_file = out_path
     # then score - BLEU
@@ -227,7 +236,7 @@ def main(args):
     args:
         out_dir, phon_type, src1, tgt1, src2, tgt2, src1_lang, src2_lang, 
         tgt_lang, train1_len, train2_len, val_len, test_len, config_temp,
-        embeds_file, emb_dim, gpu_num 
+        embeds_file, emb_dim, gpu_num
         (See 'help' descriptions below)
     """
     
@@ -242,9 +251,23 @@ def main(args):
     if phon_bool:
         phon_name = f'{args.phon_type}-{args.phon_pad}-{args.phon_gram}gram'
     else:
-        phon_name = 'base'
+        assert args.phon_pad in ['rand', 'linmap'], "With phon_type=='base', only padding "\
+                "options are 'rand' and 'linmap', not {}".format(args.phon_pad)
+        if args.phon_gram > 1:
+            print("WARNING: entered phon_gram > 1 with phon_type=='base' (useless assignment)",\
+                    flush=True)
+        phon_name = f'base-{args.phon_pad}'
+    # Tack phon_name dir onto the end of the output dir - don't mix files with other phon styles
+    args.out_dir = os.path.join(args.out_dir, phon_name)
+    print("Phon. information name for file paths:", phon_name, flush=True)
+    # Check for setting pretrained vector length for linear transform
+    if args.pretrain_vec_len and args.phon_pad != "linmap": # FIXME: calculate pretrain_vec_len
+        print("WARNING: you set --pretrain-vec-len, but --phon-pad is not 'linmap'. "
+                "Value of --pretrain-vec-len is irrelevant.", flush=True)
     # path to embeddings
-    embs_path = os.path.join(args.out_dir, 'embeds', args.embeds_file)
+    embeds_file_suffix = "-{}.txt".format(phon_name)
+    embeds_file_out = args.embeds_file + embeds_file_suffix
+    embs_path = os.path.join(args.out_dir, 'embeds', embeds_file_out)
     # Regularlize language codes
     args.src1_lang = LANG_REGULARIZER[args.src1_lang.lower()]
     args.src2_lang = LANG_REGULARIZER[args.src2_lang.lower()]
@@ -252,7 +275,7 @@ def main(args):
     #pdb.set_trace()
 
     # (2) Create directories ------------------------------------------------
-    create_dirs(out_dir=args.out_dir)
+    args.out_dir = create_dirs(out_dir=args.out_dir)
     #pdb.set_trace()
 
     # (3) Split data using split.py -----------------------------------------
@@ -303,13 +326,13 @@ def main(args):
     src1_test_data = f'{data_f1}.{args.src1_lang}.test'
     tgt1_test_data = f'{data_f1}.{args.tgt_lang}.test'
     if args.use_spm:
-        #   combine target data # FIXME just training data?
+        #   combine target data
         tgtall_train_data = os.path.join(args.out_dir, 'corpora', '{}-{}-{}'.format(args.tgt_lang, \
                 args.tgt_lang, args.train1_len + args.train2_len)) + f'.{args.tgt_lang}.train' 
         with open(tgt1_train_data, 'r') as f:
             # This data might be duplicated
             tgt1_train_lines = f.readlines()[:args.train1_len]
-            tgt1_train_text = ''.join(tgt_train_lines)
+            tgt1_train_text = ''.join(tgt1_train_lines)
         with open(tgt2_train_data, 'r') as f:
             tgt2_train_text = f.read()
         with open(tgtall_train_data, 'w') as f:
@@ -398,12 +421,11 @@ embeddings_type: "GloVe"
             'TRAINSTEPS', str(args.train_steps)).replace('VALSTEPS', str(args.val_steps)\
             ).replace('BIGMODDIM', str(4 * args.mod_dim)).replace('MODDIM', str(args.mod_dim))
     #   specific replacements
-    full_conf_text = mostly_filled_temp.replace('VOCAB', '').format(full_data_str,\
-            phon_name)
+    full_conf_text = mostly_filled_temp.replace('VOCAB', '').format(full_data_str)
     lang1_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src1_lang.upper()).format(\
-            lang1_data_str, phon_name)
+            lang1_data_str)
     lang2_conf_text = mostly_filled_temp.replace('VOCAB', '-'+args.src2_lang.upper()).format(\
-            lang2_data_str, phon_name)
+            lang2_data_str)
     # write yaml files
     # example: fr-ht/config/fr-ht-phon.yaml
     out_dir_tail = os.path.split(args.out_dir)[-1]
@@ -455,14 +477,17 @@ embeddings_type: "GloVe"
 
     # (8) Train model -------------------------------------------------------
     print("Training MT model....", flush=True)
-    train_cmd = f'onmt_train -config {full_conf_fn}'
+    train_cmd = f'python3 train.py -config {full_conf_fn}'
+    if args.phon_pad == 'linmap': # FIXME this the right condition?
+        train_cmd = train_cmd + f" --pretrain_vec_len {args.pretrain_vec_len}"
+    # train_cmd = "/usr0/home/nrrobins/miniconda3/envs/onmt/bin/" + train_cmd #FIXME
     print('\trunning', train_cmd, flush=True)
     os.system(train_cmd)
     #pdb.set_trace()
     
     # (9) Evaluate and score ------------------------------------------------
     # model dir to find model path
-    mod_dir = os.path.join(args.out_dir, 'mod', phon_name)
+    mod_dir = os.path.join(args.out_dir, 'mod')
     # testing data for src1 lang only (not src2)
     #   if we used sentencepiece, the source side should be tokenized to be translated
     #   (it's hypotheses will be de-tokenized for evaluation)
@@ -505,8 +530,12 @@ if __name__=='__main__':
             required=True)
     parser.add_argument('--phon-pad', type=str,
             help='How to pad phonological embeddings?',
-            choices=['cat', 'rand', 'zero'],
+            choices=['cat', 'rand', 'zero', 'linmap'],
             default='random')
+    parser.add_argument('--pretrain-vec-len', type=int,
+            help="input dim for linear transform if transforming embeddings into model dim "
+            "(i.e. this is the pretrained vector length and not equal to the model dim)",
+            default=0)
     parser.add_argument('--phon-gram', type=int,
             help='Organize phon embeddings via ngrams or unigrams? '
             'For unigrams, set to 1; for ngrams, set to n',
@@ -523,10 +552,10 @@ if __name__=='__main__':
     parser.add_argument('--tgt2', type=str,
             help='Target language (TGT) file aligned with src2',
             required=True)
-    parser.add_argument('--src1_lang', type=str,
+    parser.add_argument('--src1-lang', type=str,
             help='First source language (LRL, testing language)',
             required=True)
-    parser.add_argument('--src2_lang', type=str,
+    parser.add_argument('--src2-lang', type=str,
             help='Second source language (HRL, transfer language)',
             required=True)
     parser.add_argument('--tgt-lang', type=str,
@@ -585,8 +614,8 @@ if __name__=='__main__':
     main(args)
 
     '''Example usage:
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 $DATADIR/fra_hat/enht_haitian --tgt1 $DATADIR/fra_hat/enht_english --src2 $DATADIR/fra_hat/enfr_french --tgt2 $DATADIR/fra_hat/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 $DATADIR/fra_hat/enht_haitian --tgt1 $DATADIR/fra_hat/enht_english --src2 $DATADIR/fra_hat/enfr_french --tgt2 $DATADIR/fra_hat/enfr_english --src1-lang ht --src2-lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
     '''
     '''Or on patient:
-    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1_lang ht --src2_lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
+    python3 mt.py --out-dir test-test --phon-type phon --phon-pad rand --phon-gram 3 --src1 ../translation/enht_haitian --tgt1 ../translation/enht_english --src2 ../translation/enfr_french --tgt2 ../translation/enfr_english --src1-lang ht --src2-lang fr --tgt-lang en --train1-len 1500 --train2-len 25000 --val-len 500 --test-len 500 --config-temp config_template --mod-dim 512 --train-steps 1000 --save-steps 1000 --val-steps 250 --use-spm
     '''

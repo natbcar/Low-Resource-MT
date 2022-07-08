@@ -39,4 +39,6 @@ if __name__=='__main__':
 
     '''
     python3 eval.py --mod-dir /usr1/data/nrrobins/translation/onmt_outputs/ --src-test-data /usr1/data/nrrobins/translation/onmt_outputs/fr-ht/corpora/eng-hat-15000.hat.test --tgt-test-data /usr1/data/nrrobins/translation/onmt_outputs/fr-ht/corpora/eng-hat-15000.eng.test --pred-output /usr1/data/nrrobins/translation/onmt_outputs/fr-ht/pred/base-preds-5000-ep30000.txt --mod-num 30000
+
+    python3 eval.py --mod-dir /usr1/data/nrrobins/translation/onmt_outputs/fr-ht/mod/phon-linmap-3gram --src-test-data /usr1/data/nrrobins/translation/onmt_outputs/fr-ht/corpora/eng-hat-15000.hat.test --tgt-test-data /usr1/data/nrrobins/translation/onmt_outputs/fr-ht/corpora/eng-hat-15000.eng.test --pred-output /usr1/data/nrrobins/translation/onmt_outputs/fr-ht/pred/phon-linmap-3gram-preds-5000.txt --mod-num 100000
     '''

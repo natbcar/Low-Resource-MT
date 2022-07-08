@@ -8,6 +8,7 @@ import torch.nn as nn
 from onmt.modules.util_class import Elementwise
 from onmt.utils.logging import logger
 
+import pdb
 
 class SequenceTooLongError(Exception):
     pass
@@ -94,6 +95,8 @@ class Embeddings(nn.Module):
         position_encoding (bool): see :class:`~onmt.modules.PositionalEncoding`
         feat_merge (string): merge action for the features embeddings:
             concat, sum or mlp.
+        pretrain_vec_len (int): pretrained embedding dim. Set to >0 iff using
+            a linear transform to map pretrained embeddings to the model dim
         feat_vec_exponent (float): when using `-feat_merge concat`, feature
             embedding size is N^feat_dim_exponent, where N is the
             number of values the feature takes.
@@ -108,6 +111,7 @@ class Embeddings(nn.Module):
                  word_padding_idx,
                  position_encoding=False,
                  feat_merge="concat",
+                 pretrain_vec_len=0,
                  feat_vec_exponent=0.7,
                  feat_vec_size=-1,
                  feat_padding_idx=[],
@@ -126,6 +130,8 @@ class Embeddings(nn.Module):
 
         # Dimensions and padding for constructing the word embedding matrix
         vocab_sizes = [word_vocab_size]
+        if pretrain_vec_len:
+            pvl_emb_dims = [pretrain_vec_len]
         emb_dims = [word_vec_size]
         pad_indices = [word_padding_idx]
 
@@ -139,12 +145,17 @@ class Embeddings(nn.Module):
             feat_dims = [int(vocab ** feat_vec_exponent)
                          for vocab in feat_vocab_sizes]
         vocab_sizes.extend(feat_vocab_sizes)
+        if pretrain_vec_len:
+            pvl_emb_dims.extend(feat_dims)
         emb_dims.extend(feat_dims)
         pad_indices.extend(feat_padding_idx)
 
         # The embedding matrix look-up tables. The first look-up table
         # is for words. Subsequent ones are for features, if any exist.
-        emb_params = zip(vocab_sizes, emb_dims, pad_indices)
+        if pretrain_vec_len:
+            emb_params = zip(vocab_sizes, pvl_emb_dims, pad_indices)
+        else:
+            emb_params = zip(vocab_sizes, emb_dims, pad_indices)
         embeddings = [nn.Embedding(vocab, dim, padding_idx=pad, sparse=sparse)
                       for vocab, dim, pad in emb_params]
         emb_luts = Elementwise(feat_merge, embeddings)
@@ -165,10 +176,17 @@ class Embeddings(nn.Module):
         self.make_embedding = nn.Sequential()
         self.make_embedding.add_module('emb_luts', emb_luts)
 
+        #pdb.set_trace()
         if feat_merge == 'mlp' and len(feat_vocab_sizes) > 0:
             in_dim = sum(emb_dims)
             mlp = nn.Sequential(nn.Linear(in_dim, word_vec_size), nn.ReLU())
             self.make_embedding.add_module('mlp', mlp)
+
+        if pretrain_vec_len:
+            lin_map = nn.Linear(pretrain_vec_len, word_vec_size)
+            print("Mapping pretrained embeddings from emb {} to emb {}"\
+                    .format(pretrain_vec_len, word_vec_size), flush=True)
+            self.make_embedding.add_module('lin_map', lin_map)
 
         self.position_encoding = position_encoding
 
@@ -216,7 +234,7 @@ class Embeddings(nn.Module):
         """Embedding look-up table."""
         return self.make_embedding[0]
 
-    def load_pretrained_vectors(self, emb_file):
+    def load_pretrained_vectors(self, emb_file, pretrain_vec_len=0):
         """Load in pretrained embeddings.
 
         Args:
@@ -226,13 +244,17 @@ class Embeddings(nn.Module):
         if emb_file:
             pretrained = torch.load(emb_file)
             pretrained_vec_size = pretrained.size(1)
-            if self.word_vec_size > pretrained_vec_size:
-                self.word_lut.weight.data[:, :pretrained_vec_size] = pretrained
-            elif self.word_vec_size < pretrained_vec_size:
-                self.word_lut.weight.data \
-                    .copy_(pretrained[:, :self.word_vec_size])
-            else:
-                self.word_lut.weight.data.copy_(pretrained)
+            #if self.word_vec_size > pretrained_vec_size:
+            #    self.word_lut.weight.data[:, :pretrained_vec_size] = pretrained
+            #elif self.word_vec_size < pretrained_vec_size:
+            #    self.word_lut.weight.data \
+            #        .copy_(pretrained[:, :self.word_vec_size])
+            #else:
+            #    self.word_lut.weight.data.copy_(pretrained)
+            self.word_lut.weight.data = pretrained
+        elif pretrain_vec_len:
+            self.word_lut.weight.data = \
+                    self.word_lut.weight.data[:, :pretrain_vec_len] # FIXME not necessary?
 
     def forward(self, source, step=None):
         """Computes the embeddings for words and features.
@@ -246,6 +268,7 @@ class Embeddings(nn.Module):
 
         if self.position_encoding:
             for i, module in enumerate(self.make_embedding._modules.values()):
+                #pdb.set_trace()
                 if i == len(self.make_embedding._modules.values()) - 1:
                     source = module(source, step=step)
                 else:

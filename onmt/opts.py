@@ -242,6 +242,9 @@ def model_opts(parser):
               choices=['concat', 'sum', 'mlp'],
               help="Merge action for incorporating features embeddings. "
                    "Options [concat|sum|mlp].")
+    group.add('--pretrain_vec_len', '-pretrain_vec_len', type=int, default=0,
+              help="Length of input pretrained vectors; "
+                   "only set if using linear transform to model dim")
     group.add('--feat_vec_size', '-feat_vec_size', type=int, default=-1,
               help="If specified, feature embedding sizes "
                    "will be set to this. Otherwise, feat_vec_exponent "

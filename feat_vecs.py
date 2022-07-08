@@ -30,7 +30,7 @@ def pad_vec(vec: list, emb_dim: int, phon_info: dict) -> list:
     """
     phon_type, phon_pad, ngram_size = phon_info['type'], phon_info['pad'], phon_info['gram']
     if phon_type == 'phon':
-        if phon_pad == 'rand':
+        if phon_pad in ['rand', 'linmap']:
             return vec + [0] * ((PHON_EMB_LEN * ngram_size) - len(vec)) # + list(rand_fcn(emb_dim - len(vec))) 
         elif phon_pad == 'cat':
             num_repeats = emb_dim // len(vec)
@@ -50,7 +50,7 @@ def default_emb(emb_dim: int, phon_info: dict) -> list:
     """
     phon_type, phon_pad, ngram_size = phon_info['type'], phon_info['pad'], phon_info['gram']
     if phon_type == 'phon':
-        if phon_pad == 'rand':
+        if phon_pad in ['rand', 'linmap']:
             return [0] * PHON_EMB_LEN * ngram_size # Is there a better way?
         elif phon_pad == 'cat':
             return [0] * emb_dim # Is there a better way?

@@ -2,6 +2,8 @@
 import torch
 import torch.nn as nn
 
+import pdb
+
 
 # At the moment this class is only used by embeddings.Embeddings look-up tables
 class Elementwise(nn.ModuleList):
@@ -23,6 +25,7 @@ class Elementwise(nn.ModuleList):
     def forward(self, inputs):
         inputs_ = [feat.squeeze(2) for feat in inputs.split(1, dim=2)]
         assert len(self) == len(inputs_)
+        #pdb.set_trace()
         outputs = [f(x) for f, x in zip(self, inputs_)]
         if self.merge == 'first':
             return outputs[0]
