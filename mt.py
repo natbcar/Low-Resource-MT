@@ -104,7 +104,7 @@ def create_dirs(out_dir: str, out_dir_list: list=['corpora', 'pred', 'embeds', '
     print("Creating all out directories", flush=True)
     # Check if out_dir exists and fix that
     while os.path.exists(out_dir): # FIXME do fancy incremental thing
-        out_dir = out_dir + '(1)'
+        out_dir = out_dir + '_1'
     # main dir
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
