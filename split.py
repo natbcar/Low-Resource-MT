@@ -1,53 +1,13 @@
 import pickle as pkl
 import numpy as np
 import spacy
-#import en_core_web_sm
 import re
 import argparse
-#from pythainlp.tokenize import word_tokenize as thai_word_tokenize
-#from laonlp.tokenize import word_tokenize as lao_word_tokenize
-#from trtokenizer.tr_tokenizer import WordTokenizer as TurkishWordTokenizer
 import pdb
 
-#th_tokenizer = thai_word_tokenize
-#lo_tokenizer = lao_word_tokenize
-#tr_tokenizer = TurkishWordTokenizer()
-#az_tokenizer = spacy.load('xx_ent_wiki_sm')
-#ht_tokenizer = spacy.load('xx_ent_wiki_sm')
+import epitran
 
-#def tokenize(sent, lang):
-#    if lang == "tha":
-#        return " ".join(th_tokenizer(sent)).strip('\n') + " \n"
-#    elif lang == "lao":
-#        return " ".join(lo_tokenizer(sent)).strip('\n') + " \n"
-#    elif lang == "tur": # FIXME
-#        return " ".join(tr_tokenizer.tokenize(sent)).strip('\n') + " \n"
-#    elif lang == "aze":
-#        return " ".join([tok.text for tok in az_tokenizer.tokenizer(sent)]).strip('\n') + " \n"
-#    elif lang == "hat":
-#        return " ".join([tok.text for tok in ht_tokenizer.tokenizer(sent)]).strip('\n') + " \n" 
-#    elif lang == "fra":
-#        return " ".join([tok.text for tok in ht_tokenizer.tokenizer(sent)]).strip('\n') + " \n"
-
-def clean(src_lines, tgt_lines, lang):    
-    src_tok, tgt_tok = [], []
-    for src_line, tgt_line in zip(src_lines, tgt_lines):
-        if re.search('[a-zA-Z]', src_line) and lang in ["th", "lo"]:
-            continue
-        else:
-            sent = src_line
-            #sent = " ".join(tokenizer(src_line))
-            #sent = tokenize(src_line, lang)
-            #try:
-            #    sent = re.sub("\u200b", "", sent)
-            #except:
-            #    pdb.set_trace()
-            #sent = re.sub(" +", " ", sent)
-            if sent.strip() != "" and tgt_line.strip() != "":
-                src_tok.append(sent)
-                tgt_tok.append(tgt_line)
-    
-    return src_tok, tgt_tok
+from mt_tools import EPITRAN_LANGS
 
 
 def seed_everything(seed=sum(bytes(b'dragn'))):
@@ -61,6 +21,33 @@ def seed_everything(seed=sum(bytes(b'dragn'))):
     #torch.cuda.manual_seed_all(seed)
     #torch.backends.cudnn.benchmark = False
     #torch.backends.cudnn.deterministic = True
+
+
+def g2p(sent, epi):
+    """
+    Transliterate sentence to IPA using Epitran
+    """
+    return epi.transliterate(u''+sent)
+
+
+def clean(src_lines, tgt_lines, lang):    
+    # Create epitran transliterator
+    epi = epitran.Epitran(EPITRAN_LANGS[lang])
+    src_tok, tgt_tok = [], []
+    for src_line, tgt_line in zip(src_lines, tgt_lines):
+        if re.search('[a-zA-Z]', src_line) and lang in ["th", "lo"]:
+            continue
+        else:
+            sent = src_line
+            if sent.strip() != "" and tgt_line.strip() != "":
+                try:
+                    src_tok.append(g2p(sent, epi))
+                    tgt_tok.append(tgt_line)
+                except:
+                    print("WARNING: Epitran error with sentence", sent)
+                    continue
+    
+    return src_tok, tgt_tok
 
 
 def write(lines, outfile):
@@ -150,6 +137,10 @@ if __name__ == "__main__":
     parser.add_argument("--lang",
                         type=str,
                         choices=["th", "lo", "tr", "az", "fr", "ht"])
+    parser.add_argument("--tgt-lang",
+                        type=str,
+                        choices=['en', 'fr'],
+                        default='en')
     parser.add_argument("--train-len",
                         type=int)
     parser.add_argument("--val-len",
@@ -161,5 +152,8 @@ if __name__ == "__main__":
                         default=1)
     args = parser.parse_args()
 
-    main(args.src_file, args.tgt_file, args.out_file, args.lang,\
-            args.train_len, args.val_len, args.test_len, args.num_duplicates)   
+    # main(src_file, tgt_file, out_file, lang, tgt_lang, train_len, val_len, test_len, \
+    #    num_duplicates=1, seed=0)
+    main(src_file=args.src_file, tgt_file=args.tgt_file, out_file=args.out_file, lang=args.lang,\
+            tgt_lang=args.tgt_lang, train_len=args.train_len, val_len=args.val_len,\
+            test_len=args.test_len, num_duplicates=args.num_duplicates)

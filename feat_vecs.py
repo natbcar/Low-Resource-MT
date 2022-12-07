@@ -9,6 +9,8 @@ ft = panphon2.FeatureTable()
 rand_fcn = np.random.random # FIXME
 
 PHON_EMB_LEN = len(ft.word_to_bag_of_features('b'))
+MAX_EMB_DUPS = 5 # FIXME make variable
+MAX_EMB_LEN = MAX_EMB_DUPS * PHON_EMB_LEN
 
 
 def seed_everything(seed: int=sum(bytes(b'dragn'))) -> None:
@@ -51,7 +53,10 @@ def default_emb(emb_dim: int, phon_info: dict) -> list:
     phon_type, phon_pad, ngram_size = phon_info['type'], phon_info['pad'], phon_info['gram']
     if phon_type == 'phon':
         if phon_pad in ['rand', 'linmap']:
-            return [0] * PHON_EMB_LEN * ngram_size # Is there a better way?
+            if ngram_size:
+                return [0] * PHON_EMB_LEN * ngram_size # Is there a better way?
+            else:
+                return list(rand_fcn(MAX_EMB_LEN))
         elif phon_pad == 'cat':
             return [0] * emb_dim # Is there a better way?
         elif phon_pad == 'zero':
@@ -96,6 +101,7 @@ def many_w2fv(wordlist: list[str], phon_info: dict, epi_lang: str='hat-Latn-bab'
     for word in wordlist:
         # First transliterate
         try:
+            # FIXME don't do the epitran hereeee
             ipa = epi.transliterate(u''+word)
         except:
             print("Epitran WARNING:", word, flush=True)
@@ -109,7 +115,7 @@ def many_w2fv(wordlist: list[str], phon_info: dict, epi_lang: str='hat-Latn-bab'
         if epi_lang == 'hat-Latn-bab': # FIXME
             ipa = ipa.replace('ã','ɑ̃').replace('ũ','un')
         # Now obtain embedding
-        if ngram_size == 1:
+        if ngram_size == 1: # Case of 1-gram (bag of phones sum)
             try:
                 vec = ft.word_to_bag_of_features(ipa)
                 padded = pad_vec(vec, emb_dim, phon_info)
@@ -117,7 +123,27 @@ def many_w2fv(wordlist: list[str], phon_info: dict, epi_lang: str='hat-Latn-bab'
                 print("Panphon WARNING:", ipa, flush=True)
                 padded = default_emb(emb_dim, phon_info)
             emb_dict[word] = padded
-        else:
+        elif ngram_size == 0: # Case of concat/trunc based method without summing
+            phons = ft.phonemes(ipa)
+            # Construct vector
+            vec = []
+            for phon in phons:
+                try:
+                    vec += ft.word_to_bag_of_features(phon)
+                except:
+                    print("Panphon WARNING:", phon, '... part of ...', ipa, flush=True)
+                    vec += [0] * PHON_EMB_LEN
+            # Now pad # FIXME incorporate with pad_emb function
+            if len(vec) < MAX_EMB_LEN:
+                pad = list(rand_fcn(MAX_EMB_LEN - len(vec))) # FIXME
+                # vec = vec + [0] * (MAX_EMB_LEN - len(vec))
+                vec = vec + pad
+            # Or truncate
+            elif len(vec) > MAX_EMB_LEN:
+                vec = vec[:MAX_EMB_LEN]
+            # collect vector
+            emb_dict[word] = vec
+        else: # Case of n-gram (method from Chaudhary et al)
             phons = ft.phonemes(ipa)
             # Case of short words with <1 ngram
             if len(phons) < ngram_size:
@@ -152,7 +178,6 @@ def many_w2fv(wordlist: list[str], phon_info: dict, epi_lang: str='hat-Latn-bab'
                 padded = pad_vec(vec, emb_dim, phon_info)
             emb_dict[word] = padded
     print("Created phonological embeddings", flush=True)
-    # pdb.set_trace()
     return emb_dict
 
 
@@ -168,7 +193,7 @@ def write_emb(wordlist: list, emb_dict: dict, out_file: str) -> None:
     assert len(wordlist) == len(emb_dict)
     # Format embedding strings
     out_lines = []
-    for word in wordlist:
+    for w_i, word in enumerate(wordlist):
         w_vec = emb_dict[word]
         line = word + ' ' + ' '.join([str(f) for f in w_vec]) + '\n'
         out_lines.append(line)

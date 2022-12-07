@@ -1,6 +1,5 @@
 import os
 import argparse
-import re
 import pdb
 
 import sentencepiece as spm
@@ -8,27 +7,7 @@ import sentencepiece as spm
 from split import main as split_data
 import feat_vecs as fv
 
-NUMOBJ = re.compile(r'[0-9]+')
-
-LANG_REGULARIZER = {
-        'ht':'hat', 'hat':'hat', 'haitian':'hat',
-        'fr':'fra', 'fra':'fra', 'french':'fra',
-        'en':'eng', 'eng':'eng', 'english':'eng',
-        'es':'spa', 'spa':'spa', 'spanish':'spa',
-        'jm':'jam', 'jam':'jam', 'jamaican':'jam',
-        'th':'tha', 'tha':'tha', 'thai':'tha',
-        'lo':'lao', 'lao':'lao'
-        }
-
-EPITRAN_LANGS = {
-        'hat':'hat-Latn-bab',
-        'fra':'fra-Latn',
-        'spa':'spa-Latn',
-        'jam':'jam-Latn',
-        'eng':'eng-Latn',
-        'tha':'tha-Thai',
-        'lao':'lao-Laoo-prereform'
-        }
+from mt_tools import NUMOBJ, LANG_REGULARIZER, EPITRAN_LANGS
 
 
 def execute_cmd(cmd: str):
@@ -82,6 +61,7 @@ def create_phon_embeds(lang1_vocab_fn: str, lang2_vocab_fn: str, joint_vocab_fn:
             emb_dim=emb_dim, seed=seed)
     emb_dict2 = fv.many_w2fv(wordlist=lang2_vocab, phon_info=phon_info, epi_lang=EPITRAN_LANGS[lang2],\
             emb_dim=emb_dim, seed=seed)
+    print("Completed embedding construction")
     # Combine embedding dictionaries
     for key in emb_dict1:
         emb_dict2[key] = emb_dict1[key]

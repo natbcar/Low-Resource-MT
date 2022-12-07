@@ -251,7 +251,8 @@ class Embeddings(nn.Module):
             #        .copy_(pretrained[:, :self.word_vec_size])
             #else:
             #    self.word_lut.weight.data.copy_(pretrained)
-            self.word_lut.weight.data[:, :pretrain_vec_len//2] = pretrained
+            self.word_lut.weight.data = pretrained
+            #self.word_lut.weight.data[:, :pretrain_vec_len//2] = pretrained # other option
         elif pretrain_vec_len:
             self.word_lut.weight.data = \
                     self.word_lut.weight.data[:, :pretrain_vec_len] # FIXME not necessary?
