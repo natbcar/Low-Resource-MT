@@ -68,7 +68,7 @@ def default_emb(emb_dim: int, phon_info: dict) -> list:
 
 
 def many_w2fv(wordlist: list[str], phon_info: dict, epi_lang: str='hat-Latn-bab', emb_dim: int=512,\
-        seed: int=0) -> dict:
+        seed: int=0, run_epitran: bool=False) -> dict:
     """
     This function acceps a vocab list and produces phonological feature vector embeddings for 
     each word. Each word is first transliterated to IPA using epitran. Then the IPA phones are
@@ -102,7 +102,10 @@ def many_w2fv(wordlist: list[str], phon_info: dict, epi_lang: str='hat-Latn-bab'
         # First transliterate
         try:
             # FIXME don't do the epitran hereeee
-            ipa = epi.transliterate(u''+word)
+            if run_epitran:
+                ipa = epi.transliterate(u''+word)
+            else:
+                ipa = word
         except:
             print("Epitran WARNING:", word, flush=True)
             padded = default_emb(emb_dim, phon_info)
