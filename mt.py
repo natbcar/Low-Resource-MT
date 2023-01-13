@@ -58,7 +58,7 @@ def create_phon_embeds(lang1_vocab_fn: str, lang2_vocab_fn: str, joint_vocab_fn:
     joint_vocab = extract_vocab(joint_vocab_fn)
     # Create embeddings using fv.many_w2fv
     emb_dict1 = fv.many_w2fv(wordlist=lang1_vocab, phon_info=phon_info, epi_lang=EPITRAN_LANGS[lang1],\
-            emb_dim=emb_dim, seed=seed)
+            emb_dim=emb_dim, seed=seed) # FIXME make option for run_epitran
     emb_dict2 = fv.many_w2fv(wordlist=lang2_vocab, phon_info=phon_info, epi_lang=EPITRAN_LANGS[lang2],\
             emb_dim=emb_dim, seed=seed)
     print("Completed embedding construction")
