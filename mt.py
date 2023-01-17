@@ -261,9 +261,12 @@ def main(args):
     # (3) Split data using split.py -----------------------------------------
     # First figure out how many times to duplicate the src1_lang bitext data
     if args.src1_duplicates:
-        num_dups = args.src1_duplicates
+        if args.src1_duplicates < 1:
+            print("WARNING: should not have fewer than 1 duplicate of src1"\
+                    " data. Resetting to src1-duplicates to 1.", flush=True)
+        num_dups = max(1, args.src1_duplicates)
     else:
-        num_dups = args.train2_len // args.train1_len
+        num_dups = max(1, args.train2_len // args.train1_len)
     if num_dups > 1:
         print(f"Duplicating {args.src1_lang} data {num_dups} times", flush=True)
     # Now split data
@@ -284,7 +287,7 @@ def main(args):
             args.src2_lang, args.train2_len))
     split_data(src_file=args.src2, tgt_file=args.tgt2, out_file=data_f2+'.', \
             lang=args.src2_lang, tgt_lang=args.tgt_lang, train_len=args.train2_len, \
-            val_len=args.val_len, test_len=args.test_len)
+            val_len=0, test_len=0) # val_len=args.val_len, test_len=args.test_len)
     #pdb.set_trace()
 
     # (4) Tokenize text using sentencepiece ---------------------------------

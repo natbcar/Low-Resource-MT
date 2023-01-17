@@ -46,13 +46,16 @@ def clean(src_lines, tgt_lines, lang):
                 except:
                     print("WARNING: Epitran error with sentence", sent)
                     continue
-    
+   
     return src_tok, tgt_tok
 
 
 def write(lines, outfile):
+    if not lines:
+        return
     with open(outfile, "w") as f:
         f.writelines(lines)
+    return
 
 
 def main(src_file, tgt_file, out_file, lang, tgt_lang, train_len, val_len, test_len, \
